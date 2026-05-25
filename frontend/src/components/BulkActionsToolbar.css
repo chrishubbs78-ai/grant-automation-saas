@@ -1,0 +1,138 @@
+.bulk-actions-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f0f7ff;
+  border: 1px solid #b3d9ff;
+  border-radius: 6px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  gap: 16px;
+}
+
+.bulk-actions-left {
+  display: flex;
+  align-items: center;
+}
+
+.bulk-selection-count {
+  font-weight: 600;
+  color: #4a90e2;
+  font-size: 14px;
+}
+
+.bulk-actions-right {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.bulk-dropdown-wrapper {
+  position: relative;
+}
+
+.btn-bulk-action {
+  padding: 8px 12px;
+  border: 1px solid #d0d0d0;
+  border-radius: 4px;
+  background: white;
+  color: #333;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.btn-bulk-action:hover {
+  background: #f8f9fa;
+  border-color: #999;
+}
+
+.btn-bulk-status {
+  border-color: #4a90e2;
+  color: #4a90e2;
+}
+
+.btn-bulk-status:hover {
+  background: #e3f2fd;
+}
+
+.btn-bulk-export {
+  border-color: #2e7d32;
+  color: #2e7d32;
+}
+
+.btn-bulk-export:hover {
+  background: #e8f5e9;
+}
+
+.btn-bulk-clear {
+  border-color: #c62828;
+  color: #c62828;
+}
+
+.btn-bulk-clear:hover {
+  background: #ffebee;
+}
+
+.bulk-dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  margin-top: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  min-width: 140px;
+}
+
+.bulk-dropdown-item {
+  display: block;
+  width: 100%;
+  padding: 10px 14px;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  font-size: 13px;
+  color: #333;
+  transition: background 0.2s;
+}
+
+.bulk-dropdown-item:hover {
+  background: #f5f5f5;
+}
+
+.bulk-dropdown-item:first-child {
+  border-radius: 4px 4px 0 0;
+}
+
+.bulk-dropdown-item:last-child {
+  border-radius: 0 0 4px 4px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .bulk-actions-toolbar {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .bulk-actions-left,
+  .bulk-actions-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .bulk-actions-right {
+    flex-wrap: wrap;
+  }
+
+  .btn-bulk-action {
+    flex: 1;
+    min-width: 100px;
+  }
+}

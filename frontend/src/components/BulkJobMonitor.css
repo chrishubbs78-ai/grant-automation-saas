@@ -1,0 +1,153 @@
+.bulk-job-monitor {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  width: 100%;
+  max-width: 400px;
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.monitor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: #f5f5f5;
+  border-bottom: 1px solid #eee;
+}
+
+.monitor-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.btn-close-monitor {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: #999;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-close-monitor:hover {
+  color: #333;
+}
+
+.monitor-loading {
+  padding: 20px;
+  text-align: center;
+  color: #666;
+  font-size: 13px;
+}
+
+.monitor-error {
+  padding: 16px;
+  background: #ffebee;
+  border-bottom: 1px solid #f5a5a7;
+  color: #c62828;
+  font-size: 13px;
+}
+
+.monitor-progress {
+  padding: 16px;
+}
+
+.progress-bar-container {
+  width: 100%;
+  height: 8px;
+  background: #e0e0e0;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4a90e2, #357abd);
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  font-size: 12px;
+  color: #666;
+  text-align: center;
+}
+
+.monitor-success {
+  padding: 16px;
+  background: #e8f5e9;
+  border-bottom: 1px solid #81c784;
+  color: #2e7d32;
+  font-size: 13px;
+  text-align: center;
+}
+
+.monitor-download {
+  margin-top: 12px;
+}
+
+.btn-download {
+  display: inline-block;
+  padding: 8px 12px;
+  background: #4a90e2;
+  color: white;
+  text-decoration: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+.btn-download:hover {
+  background: #357abd;
+}
+
+.monitor-error-detail {
+  padding: 16px;
+  background: #ffebee;
+  border-bottom: 1px solid #f5a5a7;
+  color: #c62828;
+}
+
+.monitor-error-detail strong {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.monitor-error-detail p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.monitor-status {
+  padding: 12px 16px;
+  font-size: 12px;
+  color: #666;
+  background: #f9f9f9;
+  border-top: 1px solid #eee;
+  text-align: center;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .bulk-job-monitor {
+    bottom: 10px;
+    right: 10px;
+    left: 10px;
+    max-width: none;
+  }
+}

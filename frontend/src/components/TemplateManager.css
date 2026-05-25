@@ -1,0 +1,329 @@
+.template-manager {
+  background: white;
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.template-manager-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #eee;
+}
+
+.template-manager-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+}
+
+.btn-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #999;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+}
+
+.btn-close:hover {
+  color: #333;
+}
+
+/* Filters */
+.template-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.filter-btn {
+  padding: 6px 12px;
+  background: #f0f0f0;
+  border: 1px solid #e0e0e0;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s;
+  color: #666;
+}
+
+.filter-btn:hover {
+  background: #e8e8e8;
+}
+
+.filter-btn.active {
+  background: #4a90e2;
+  color: white;
+  border-color: #4a90e2;
+}
+
+/* New Template Button */
+.btn-new-template {
+  display: block;
+  width: 100%;
+  padding: 10px 16px;
+  margin-bottom: 16px;
+  background: #4a90e2;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+.btn-new-template:hover {
+  background: #357abd;
+}
+
+/* Template Form */
+.template-form {
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 500;
+  color: #333;
+  font-size: 13px;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #d0d0d0;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: #4a90e2;
+  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+}
+
+.json-textarea {
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  background: white;
+}
+
+.form-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-save,
+.btn-cancel {
+  flex: 1;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+.btn-save {
+  background: #4caf50;
+  color: white;
+}
+
+.btn-save:hover {
+  background: #3d8b40;
+}
+
+.btn-cancel {
+  background: #f0f0f0;
+  color: #666;
+  border: 1px solid #e0e0e0;
+}
+
+.btn-cancel:hover {
+  background: #e8e8e8;
+}
+
+/* Templates List */
+.templates-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.empty-templates {
+  text-align: center;
+  padding: 24px;
+  color: #999;
+  font-size: 14px;
+}
+
+.template-card {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 12px;
+  transition: all 0.2s;
+}
+
+.template-card:hover {
+  border-color: #d0d0d0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+}
+
+.template-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.template-header h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.template-type {
+  display: inline-block;
+  padding: 2px 8px;
+  background: #e3f2fd;
+  color: #1976d2;
+  border-radius: 3px;
+  font-size: 11px;
+  margin-top: 4px;
+  text-transform: capitalize;
+}
+
+.usage-count {
+  font-size: 12px;
+  color: #999;
+  white-space: nowrap;
+}
+
+.template-description {
+  margin: 0 0 10px 0;
+  font-size: 12px;
+  color: #666;
+  line-height: 1.4;
+}
+
+.template-actions {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.template-actions button {
+  flex: 1;
+  min-width: 70px;
+  padding: 6px 10px;
+  border: 1px solid #d0d0d0;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-apply {
+  background: #4a90e2;
+  color: white;
+  border-color: #4a90e2;
+}
+
+.btn-apply:hover {
+  background: #357abd;
+}
+
+.btn-edit {
+  background: #fff;
+  color: #4a90e2;
+  border-color: #4a90e2;
+}
+
+.btn-edit:hover {
+  background: #e3f2fd;
+}
+
+.btn-duplicate {
+  background: #fff;
+  color: #666;
+  border-color: #d0d0d0;
+}
+
+.btn-duplicate:hover {
+  background: #f8f9fa;
+}
+
+.btn-delete {
+  background: #fff;
+  color: #c62828;
+  border-color: #c62828;
+}
+
+.btn-delete:hover {
+  background: #ffebee;
+}
+
+/* Error Message */
+.error-message {
+  padding: 12px 16px;
+  background: #ffebee;
+  border: 1px solid #f5a5a7;
+  border-radius: 4px;
+  color: #c62828;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .template-manager {
+    padding: 16px;
+  }
+
+  .template-header {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .template-actions {
+    gap: 6px;
+  }
+
+  .template-actions button {
+    flex: 1;
+    min-width: 60px;
+    font-size: 11px;
+  }
+}

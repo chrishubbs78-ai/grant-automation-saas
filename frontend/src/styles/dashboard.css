@@ -779,6 +779,27 @@
   color: #1a1a1a;
 }
 
+.draft-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn-download-docx {
+  display: inline-block;
+  padding: 7px 14px;
+  background: #1e3a5f;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+.btn-download-docx:hover { background: #163055; }
+
 .btn-copy-draft {
   padding: 7px 14px;
   background: #f0fdf4;

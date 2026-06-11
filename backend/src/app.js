@@ -33,7 +33,8 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// Middleware
+// Default body parser — small limit for all standard JSON routes.
+// File-upload routes (/api/rfp/upload, /api/financials) apply their own larger limit.
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
@@ -49,6 +50,7 @@ app.use('/api/outcomes', require('./routes/outcomes'));
 app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/reapply', require('./routes/reapply'));
 app.use('/api/financials', require('./routes/financials'));
+app.use('/api/export', require('./routes/export'));
 
 // Health check
 app.get('/health', (req, res) => {

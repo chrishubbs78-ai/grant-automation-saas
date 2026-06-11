@@ -5,6 +5,7 @@ import TemplateManager from './TemplateManager';
 import BulkActionsToolbar from './BulkActionsToolbar';
 import BulkJobMonitor from './BulkJobMonitor';
 import FinancialsVault from './FinancialsVault';
+import ReapplyQueue from './ReapplyQueue';
 import '../styles/dashboard.css';
 
 export default function Dashboard({ orgProfile }) {
@@ -459,7 +460,33 @@ export default function Dashboard({ orgProfile }) {
                   <div className="draft-section">
                     <div className="draft-header">
                       <h3>✅ Expert Grant Proposal Draft</h3>
-                      <button className="btn-copy-draft" onClick={() => {
+                      <div className="draft-header-actions">
+                        {jobStatus === 'complete' && rfpAnalysis && (
+                          <a
+                            className="btn-download-docx"
+                            href={`http://localhost:4006/api/export/grants/${draft?.grant_id}/docx`}
+                            target="_blank"
+                            rel="noreferrer"
+                            title="Download formatted Word document"
+                            onClick={e => {
+                              e.preventDefault();
+                              const token = localStorage.getItem('token');
+                              fetch(`http://localhost:4006/api/export/grants/${draft?.grant_id}/docx`, {
+                                headers: { Authorization: `Bearer ${token}` }
+                              }).then(r => r.blob()).then(blob => {
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = `Proposal_${rfpAnalysis.funder_name || 'Grant'}.docx`;
+                                a.click();
+                                URL.revokeObjectURL(url);
+                              });
+                            }}
+                          >
+                            ⬇ Download .docx
+                          </a>
+                        )}
+                        <button className="btn-copy-draft" onClick={() => {
                         const full = [
                           draft.executive_summary && `EXECUTIVE SUMMARY\n${draft.executive_summary}`,
                           draft.organization_background && `ORGANIZATION BACKGROUND\n${draft.organization_background}`,
@@ -472,7 +499,9 @@ export default function Dashboard({ orgProfile }) {
                         ].filter(Boolean).join('\n\n---\n\n');
                         navigator.clipboard.writeText(full);
                         alert('Full draft copied to clipboard!');
-                      }}>📋 Copy Full Draft</button>
+                      }}
+                      >📋 Copy Full Draft</button>
+                      </div>
                     </div>
                     <div className="draft-content">
                       {draft.executive_summary && (
@@ -622,6 +651,9 @@ export default function Dashboard({ orgProfile }) {
             )}
           </section>
         )}
+
+        {/* Reapply Queue */}
+        <ReapplyQueue onReapplyComplete={() => { fetchGrants(currentFilters, pagination.page); fetchAnalytics(); }} />
 
         {/* Grants List */}
         <section className="grants-section">

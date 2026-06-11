@@ -4,21 +4,38 @@ const { verifyToken } = require('../middleware/auth');
 const { Organization, Grant, RFPAnalysis } = require('../models');
 const { parseRFP } = require('../services/claudeService');
 const { researchFunder } = require('../services/geminiService');
+const { extractTextFromBase64, truncateForClaude } = require('../services/fileParserService');
 const logger = require('../utils/logger');
 const router = express.Router();
 
 // Store job status (in-memory for MVP, use Redis in production)
 const jobStatus = new Map();
 
-// POST upload RFP
-router.post('/upload', verifyToken, async (req, res) => {
+// Large body limit for this route only (file uploads can be ~10–20 MB as base64)
+const largeJsonParser = express.json({ limit: '25mb' });
+
+// POST upload RFP — accepts { rfpText } for plain text OR { fileData, mimeType, fileName } for binary files
+router.post('/upload', largeJsonParser, verifyToken, async (req, res) => {
   try {
-    const { rfpText, fileName } = req.body;
+    let { rfpText, fileName, fileData, mimeType } = req.body;
+
+    // If file data was sent as base64, extract text from it
+    if (fileData && !rfpText) {
+      try {
+        rfpText = await extractTextFromBase64(fileData, mimeType, fileName);
+        rfpText = truncateForClaude(rfpText);
+      } catch (parseErr) {
+        return res.status(422).json({
+          success: false,
+          error: `Could not extract text from file: ${parseErr.message}`
+        });
+      }
+    }
 
     if (!rfpText || rfpText.trim().length === 0) {
       return res.status(400).json({
         success: false,
-        error: 'RFP text required'
+        error: 'RFP text required. Upload a PDF, DOCX, or TXT file, or paste the text directly.'
       });
     }
 

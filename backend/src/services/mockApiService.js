@@ -185,34 +185,83 @@ function getMockFunderResearch(funderName, requirements = []) {
   };
 }
 
-// Mock draft generation response
+// Expert mock draft generation (all 8 sections)
 function getMockDraft({ orgProfile, rfpAnalysis }) {
   const orgName = orgProfile.name || 'Our Organization';
   const funderName = rfpAnalysis.funder_name || 'the Funder';
+  const budget = orgProfile.annualBudget || orgProfile.annual_budget || 500000;
+  const pop = orgProfile.targetPopulation || orgProfile.target_population || 'underserved youth';
+  const served = orgProfile.annualClientsServed || orgProfile.annual_clients_served || 2500;
 
   return {
-    problem_statement: `Communities across America are facing significant challenges related to education equity and access. ${orgName} ` +
-      `has identified that low-income neighborhoods lack adequate resources for STEM education, with less than 30% of students ` +
-      `completing STEM coursework compared to 50% in well-resourced areas. This inequity begins early and compounds over time, ` +
-      `limiting career opportunities and perpetuating economic disparity. Our organization, with 8 years of direct experience ` +
-      `serving 2,500+ students annually, has developed evidence-based approaches to address this gap. With support from ${funderName}, ` +
-      `we will expand our proven curriculum to reach an additional 1,000 underrepresented students in STEM fields.`,
+    executive_summary:
+      `${orgName} requests $${(budget * 0.2).toLocaleString()} from ${funderName} to expand our evidence-based program serving ${served.toLocaleString()} ${pop} annually. ` +
+      `With ${orgProfile.yearsInOperation || orgProfile.years_in_operation || 8} years of proven outcomes and a ${orgProfile.financialStatus || 'stable'} financial base, ` +
+      `we are uniquely positioned to deliver measurable impact aligned with ${funderName}'s priorities. ` +
+      `This investment will increase program capacity by 40%, reaching 1,000 additional participants in the next 18 months.`,
 
-    impact_statement: `This project will directly impact 1,000 additional students from underrepresented backgrounds, providing them with ` +
-      `hands-on STEM education, mentorship, and career pathways. Based on our prior work, we expect 75% of participants to complete the ` +
-      `program, 85% to show measurable improvement in STEM skills, and 60% to pursue STEM-related careers or advanced education. Indirect ` +
-      `impacts include strengthened school partnerships, professional development for 50 teachers, and creation of replicable curriculum ` +
-      `models for adoption by other organizations. Over five years, we project this initiative will benefit 5,000+ students and contribute ` +
-      `to addressing critical STEM workforce shortages in our region.`,
+    organization_background:
+      `Founded ${orgProfile.yearsInOperation || orgProfile.years_in_operation || '8'} years ago, ${orgName} has built a track record of delivering measurable outcomes for ${pop}. ` +
+      `${orgProfile.trackRecord || orgProfile.track_record || 'Our work has earned recognition from local and national funders for our rigorous evaluation approach and community-centered model.'} ` +
+      `We currently operate with an annual budget of $${(budget).toLocaleString()}, supported by a diversified revenue base including government contracts, foundation grants, and earned income.\n\n` +
+      `Our experienced team of professionals is led by a board of ${orgProfile.boardComposition?.size || 12} community leaders. ` +
+      `We hold a 501(c)(3) designation and have completed independent financial audits. ` +
+      `Our partnerships with ${(orgProfile.partnerships || []).length > 0 ? (orgProfile.partnerships || []).slice(0, 2).join(' and ') : 'local schools, government agencies, and community organizations'} ` +
+      `extend our reach and strengthen program quality.`,
 
-    budget_narrative: `Our $500,000 budget request is structured to ensure quality programming while maintaining financial sustainability. ` +
-      `Personnel costs ($250,000, 50%) support our experienced Program Director, 3 full-time instructors, and 1 part-time evaluator—all ` +
-      `critical to maintaining our proven 85% program completion rate. Program operations ($150,000, 30%) cover curriculum development, ` +
-      `classroom materials, technology equipment, and student incentives. We prioritize hands-on learning with real equipment. Evaluation and ` +
-      `outcomes tracking ($50,000, 10%) funds our independent evaluator to assess impact against concrete metrics. Administration ($50,000, 10%) ` +
-      `covers essential operations and compliance. Our cost per student ($500) is competitive with similar programs and 40% lower than national ` +
-      `averages. We commit 15% organizational cost-share through in-kind facility donations and executive leadership time. This budget will serve ` +
-      `1,000 new students while maintaining the high-touch mentorship that defines our approach.`
+    statement_of_need:
+      `The challenge facing ${pop} in our service area is both well-documented and urgent. National data shows that without targeted intervention, these individuals face significant barriers to economic mobility and long-term wellbeing. ` +
+      `${orgProfile.problemStatement || orgProfile.problem_statement || 'Local research confirms this need is acute in our community, with rates exceeding national averages by 30-40%.'} ` +
+      `Despite this documented need, existing services reach fewer than 20% of those who qualify, leaving a critical gap.\n\n` +
+      `Root causes include inadequate public investment, systemic inequities, and limited access to high-quality, culturally responsive programming. ` +
+      `Community needs assessments conducted in ${new Date().getFullYear() - 1} confirmed this gap directly from ${pop}: ` +
+      `87% reported unmet need, and 73% identified our proposed program model as their preferred solution. ` +
+      `Without intervention, the consequences compound over time — affecting not just individuals but families and the broader community economy.`,
+
+    goals_and_objectives:
+      `GOAL: Expand equitable access to high-quality services for ${pop} in our service area.\n\n` +
+      `Objective 1: By Month 6, enroll 500 new participants (40% increase over baseline) with at least 60% from highest-need zip codes.\n` +
+      `Objective 2: By Month 12, achieve an 85% program completion rate, measured by attendance and milestone attainment records.\n` +
+      `Objective 3: By Month 18, 75% of completers will demonstrate measurable improvement on standardized outcome assessments.\n` +
+      `Objective 4: By Month 18, 60% of completers will achieve a defined positive outcome (employment, education enrollment, or housing stability).\n` +
+      `Objective 5: By end of grant period, document learnings and create a replication toolkit distributed to 5+ peer organizations.`,
+
+    program_design:
+      `${orgName}'s program model is grounded in ${orgProfile.evidenceBase || orgProfile.evidence_base || 'trauma-informed, strengths-based practice'} — an approach with strong evidence across multiple randomized controlled trials. ` +
+      `${orgProfile.theoryOfChange || orgProfile.theory_of_change || 'Our theory of change holds that when individuals receive consistent, high-quality, culturally responsive support, they develop the skills and networks needed to achieve lasting change.'}\n\n` +
+      `Program implementation follows a structured 3-phase model: (1) Intake and individualized planning in Months 1-3, ` +
+      `(2) Core services delivery with weekly touchpoints in Months 4-12, and (3) Transition planning and alumni support in Months 13-18. ` +
+      `Each participant receives approximately 120 hours of direct service, supported by a trained staff-to-participant ratio of 1:15. ` +
+      `Our existing infrastructure, technology platform, and partnership network allow us to scale immediately without a ramp-up period.`,
+
+    evaluation_plan:
+      `Our evaluation approach uses a mixed-methods design to capture both quantitative outcomes and qualitative participant experience. ` +
+      `Quantitative data is collected at enrollment, 6 months, and program exit using validated instruments. ` +
+      `Data is entered into our secure case management system and reviewed monthly by our Program Manager. ` +
+      `An independent external evaluator will conduct a summative evaluation at Month 18 with a comparison group.\n\n` +
+      `Key metrics tracked: enrollment and retention, service hours delivered, goal attainment, standardized outcome scores, and 6-month post-exit outcomes. ` +
+      `We will share quarterly data reports with ${funderName} and publish an annual outcomes report publicly. ` +
+      `Findings will directly inform continuous improvement cycles and feed into our learning management system for ongoing staff development.`,
+
+    sustainability_plan:
+      `This grant provides critical bridge funding to expand capacity; ${orgName} has a clear plan to sustain this work beyond the grant period. ` +
+      `We are in active conversations with two government agencies about multi-year contracts that would fund 60% of expanded program costs. ` +
+      `We are also diversifying our foundation portfolio, with 4 additional grant proposals submitted or in development this fiscal year.\n\n` +
+      `Over the grant period, we will build earned revenue components — training fees, consulting, and a social enterprise pilot — projected to generate $75,000/year by Year 3. ` +
+      `Our board has committed to a 12-month bridge reserve fund and is conducting a capital campaign targeting $250,000. ` +
+      `${orgProfile.sustainabilityPlan || orgProfile.sustainability_plan || 'We are committed to not creating dependency — every program participant has an exit plan, and our operating model is designed for long-term viability without reliance on any single funder.'}`,
+
+    budget_narrative:
+      `The total project budget of $${(budget * 0.2).toLocaleString()} covers 18 months of expanded operations. ` +
+      `Personnel (55%, $${Math.round(budget * 0.11).toLocaleString()}) represents the largest cost center: a full-time Program Coordinator ($65,000/year, 100% allocated), ` +
+      `2 part-time case managers ($40,000 each, 50% allocated), and 10% of the Executive Director's time for oversight and quality assurance. ` +
+      `All salaries are benchmarked against local nonprofit sector data and include benefits at 25%.\n\n` +
+      `Program operations (25%, $${Math.round(budget * 0.05).toLocaleString()}) covers participant materials, technology licenses, transportation assistance, and training. ` +
+      `Evaluation (10%, $${Math.round(budget * 0.02).toLocaleString()}) funds the external evaluator, data systems, and reporting. ` +
+      `Administration and indirect costs (10%) are well below our federally-negotiated rate of 15%, reflecting our commitment to program efficiency.\n\n` +
+      `Cost per participant is $${Math.round((budget * 0.2) / 1000).toLocaleString()} — approximately 40% below comparable programs nationally per third-party benchmarking. ` +
+      `We are leveraging $${Math.round(budget * 0.05).toLocaleString()} in in-kind contributions (facilities, volunteer hours) not included in this request. ` +
+      `${funderName}'s investment is the cornerstone of a $${Math.round(budget * 0.35).toLocaleString()} diversified budget that includes government contracts, individual donations, and earned revenue.`
   };
 }
 

@@ -33,21 +33,23 @@ router.get('/', verifyToken, async (req, res) => {
 router.post('/questionnaire', verifyToken, async (req, res) => {
   try {
     const {
-      name,
-      mission,
-      vision,
-      problemStatement,
-      targetPopulation,
-      yearsInOperation,
-      teamSummary,
-      trackRecord,
-      pastGrantsCount,
-      annualBudget,
-      financialStatus,
-      evaluationCapabilities,
-      partnerships,
-      constraints,
-      questionnaire
+      // Basics
+      name, mission, vision, yearsInOperation,
+      website, phone, address, ein, taxExemptStatus, nteeCode,
+      // Problem & population
+      problemStatement, targetPopulation, geographicScope, geographicServiceArea, annualClientsServed,
+      // Programs & evidence
+      programsAndServices, theoryOfChange, evidenceBase,
+      // Track record & outcomes
+      trackRecord, outcomesData, pastGrantsCount,
+      // Team & governance
+      teamSummary, keyStaff, boardComposition,
+      // Financials
+      annualBudget, financialStatus, revenueBreakdown, reservesMonths, auditCompleted,
+      // Sustainability & strategy
+      sustainabilityPlan, diversityEquityInclusion, previousGrantors,
+      // Other
+      evaluationCapabilities, partnerships, constraints, questionnaire
     } = req.body;
 
     if (!name) {
@@ -61,45 +63,24 @@ router.post('/questionnaire', verifyToken, async (req, res) => {
       where: { userId: req.user.userId }
     });
 
+    const updateFields = {
+      name, mission, vision, yearsInOperation,
+      website, phone, address, ein, taxExemptStatus, nteeCode,
+      problemStatement, targetPopulation, geographicScope, geographicServiceArea, annualClientsServed,
+      programsAndServices, theoryOfChange, evidenceBase,
+      trackRecord, outcomesData, pastGrantsCount,
+      teamSummary, keyStaff, boardComposition,
+      annualBudget, financialStatus, revenueBreakdown, reservesMonths, auditCompleted,
+      sustainabilityPlan, diversityEquityInclusion, previousGrantors,
+      evaluationCapabilities, partnerships, constraints, questionnaire
+    };
+    // Strip undefined so partial saves don't overwrite existing values with null
+    Object.keys(updateFields).forEach(k => updateFields[k] === undefined && delete updateFields[k]);
+
     if (org) {
-      // Update existing
-      await org.update({
-        name,
-        mission,
-        vision,
-        problemStatement,
-        targetPopulation,
-        yearsInOperation,
-        teamSummary,
-        trackRecord,
-        pastGrantsCount,
-        annualBudget,
-        financialStatus,
-        evaluationCapabilities,
-        partnerships,
-        constraints,
-        questionnaire
-      });
+      await org.update(updateFields);
     } else {
-      // Create new
-      org = await Organization.create({
-        userId: req.user.userId,
-        name,
-        mission,
-        vision,
-        problemStatement,
-        targetPopulation,
-        yearsInOperation,
-        teamSummary,
-        trackRecord,
-        pastGrantsCount,
-        annualBudget,
-        financialStatus,
-        evaluationCapabilities,
-        partnerships,
-        constraints,
-        questionnaire
-      });
+      org = await Organization.create({ userId: req.user.userId, ...updateFields });
     }
 
     res.json({

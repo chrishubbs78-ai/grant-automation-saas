@@ -1,7 +1,7 @@
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const { verifyToken } = require('../middleware/auth');
-const { Organization, Grant, RFPAnalysis, Draft } = require('../models');
+const { Organization, Grant, RFPAnalysis, Draft, Analytics } = require('../models');
 const { generateDraft } = require('../services/claudeService');
 const logger = require('../utils/logger');
 const router = express.Router();
@@ -148,15 +148,15 @@ async function processDraft(jobId, rfpAnalysisId, orgId, org) {
       orgId
     });
 
-    // Generate draft with Claude (use org profile + RFP context)
-    logger.info({ jobId, orgId }, 'Generating draft with Claude...');
+    // Pull learning analytics to feed into draft generation
+    const analytics = await Analytics.findOne({ where: { org_id: orgId } });
+
+    // Generate expert draft with full org profile + RFP context + learning insights
+    logger.info({ jobId, orgId }, 'Generating expert draft with Claude...');
     const draft = await generateDraft({
-      orgProfile: {
-        name: org.name,
-        mission: org.mission,
-        track_record: org.track_record
-      },
-      rfpAnalysis: rfp.get({ plain: true })
+      orgProfile: org.get({ plain: true }),
+      rfpAnalysis: rfp.get({ plain: true }),
+      analytics: analytics ? analytics.get({ plain: true }) : null
     });
 
     jobStatus.set(jobId, {
@@ -165,14 +165,23 @@ async function processDraft(jobId, rfpAnalysisId, orgId, org) {
       orgId
     });
 
-    // Store draft in database
+    // Store all 8 draft sections in database
     const draftRecord = await Draft.create({
       grant_id: rfp.grant_id,
       org_id: orgId,
       version: 1,
-      problem_statement: draft.problem_statement || '',
-      impact_statement: draft.impact_statement || '',
-      budget_narrative: draft.budget_narrative || ''
+      // Legacy fields (mapped for backward compat)
+      problem_statement: draft.statement_of_need || draft.problem_statement || '',
+      impact_statement: draft.goals_and_objectives || draft.impact_statement || '',
+      budget_narrative: draft.budget_narrative || '',
+      // New expert sections
+      executive_summary: draft.executive_summary || '',
+      organization_background: draft.organization_background || '',
+      statement_of_need: draft.statement_of_need || '',
+      goals_and_objectives: draft.goals_and_objectives || '',
+      program_design: draft.program_design || '',
+      evaluation_plan: draft.evaluation_plan || '',
+      sustainability_plan: draft.sustainability_plan || ''
     });
 
     jobStatus.set(jobId, {

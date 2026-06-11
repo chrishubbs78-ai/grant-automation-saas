@@ -760,6 +760,63 @@
   cursor: pointer;
 }
 
+.header-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+/* Expert draft display */
+.draft-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.draft-header h3 {
+  margin: 0;
+  font-size: 17px;
+  color: #1a1a1a;
+}
+
+.btn-copy-draft {
+  padding: 7px 14px;
+  background: #f0fdf4;
+  border: 1px solid #86efac;
+  color: #15803d;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.15s;
+}
+.btn-copy-draft:hover { background: #dcfce7; }
+
+.draft-section-item {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin-bottom: 12px;
+}
+
+.draft-section-item h4 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #2563eb;
+}
+
+.draft-section-item p {
+  margin: 0;
+  line-height: 1.7;
+  font-size: 14px;
+  color: #374151;
+  white-space: pre-line;
+}
+
 /* Responsive for mobile */
 @media (max-width: 768px) {
   .grant-card {

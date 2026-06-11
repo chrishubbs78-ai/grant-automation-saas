@@ -4,6 +4,7 @@ import SearchFilter from './SearchFilter';
 import TemplateManager from './TemplateManager';
 import BulkActionsToolbar from './BulkActionsToolbar';
 import BulkJobMonitor from './BulkJobMonitor';
+import FinancialsVault from './FinancialsVault';
 import '../styles/dashboard.css';
 
 export default function Dashboard({ orgProfile }) {
@@ -51,6 +52,7 @@ export default function Dashboard({ orgProfile }) {
 
   // Template manager state
   const [showTemplateManager, setShowTemplateManager] = useState(false);
+  const [showFinancialsVault, setShowFinancialsVault] = useState(false);
 
   // Bulk operations state
   const [selectedGrants, setSelectedGrants] = useState(new Set());
@@ -379,13 +381,14 @@ export default function Dashboard({ orgProfile }) {
         <section className="rfp-section">
           <div className="section-header">
             <h2>Upload RFP or Grant Opportunity</h2>
-            <button
-              className="btn-templates"
-              onClick={() => setShowTemplateManager(true)}
-              title="Browse and apply saved templates"
-            >
-              📋 Templates
-            </button>
+            <div className="header-buttons">
+              <button className="btn-templates" onClick={() => setShowFinancialsVault(true)} title="Secure financial documents">
+                🔒 Financials
+              </button>
+              <button className="btn-templates" onClick={() => setShowTemplateManager(true)} title="Browse and apply saved templates">
+                📋 Templates
+              </button>
+            </div>
           </div>
           <RFPUploader onUploadComplete={handleUploadComplete} />
         </section>
@@ -451,23 +454,75 @@ export default function Dashboard({ orgProfile }) {
                   </ul>
                 </div>
 
-                {/* Draft Generation Section */}
+                {/* Expert Draft Sections */}
                 {draft ? (
                   <div className="draft-section">
-                    <h3>✅ Draft Generated</h3>
+                    <div className="draft-header">
+                      <h3>✅ Expert Grant Proposal Draft</h3>
+                      <button className="btn-copy-draft" onClick={() => {
+                        const full = [
+                          draft.executive_summary && `EXECUTIVE SUMMARY\n${draft.executive_summary}`,
+                          draft.organization_background && `ORGANIZATION BACKGROUND\n${draft.organization_background}`,
+                          draft.statement_of_need && `STATEMENT OF NEED\n${draft.statement_of_need}`,
+                          (draft.goals_and_objectives || draft.impact_statement) && `GOALS & OBJECTIVES\n${draft.goals_and_objectives || draft.impact_statement}`,
+                          draft.program_design && `PROGRAM DESIGN\n${draft.program_design}`,
+                          draft.evaluation_plan && `EVALUATION PLAN\n${draft.evaluation_plan}`,
+                          draft.sustainability_plan && `SUSTAINABILITY PLAN\n${draft.sustainability_plan}`,
+                          draft.budget_narrative && `BUDGET NARRATIVE\n${draft.budget_narrative}`
+                        ].filter(Boolean).join('\n\n---\n\n');
+                        navigator.clipboard.writeText(full);
+                        alert('Full draft copied to clipboard!');
+                      }}>📋 Copy Full Draft</button>
+                    </div>
                     <div className="draft-content">
-                      <div className="draft-section-item">
-                        <h4>Problem Statement</h4>
-                        <p>{draft.problem_statement}</p>
-                      </div>
-                      <div className="draft-section-item">
-                        <h4>Impact Statement</h4>
-                        <p>{draft.impact_statement}</p>
-                      </div>
-                      <div className="draft-section-item">
-                        <h4>Budget Narrative</h4>
-                        <p>{draft.budget_narrative}</p>
-                      </div>
+                      {draft.executive_summary && (
+                        <div className="draft-section-item">
+                          <h4>Executive Summary</h4>
+                          <p>{draft.executive_summary}</p>
+                        </div>
+                      )}
+                      {draft.organization_background && (
+                        <div className="draft-section-item">
+                          <h4>Organization Background</h4>
+                          <p>{draft.organization_background}</p>
+                        </div>
+                      )}
+                      {(draft.statement_of_need || draft.problem_statement) && (
+                        <div className="draft-section-item">
+                          <h4>Statement of Need</h4>
+                          <p>{draft.statement_of_need || draft.problem_statement}</p>
+                        </div>
+                      )}
+                      {(draft.goals_and_objectives || draft.impact_statement) && (
+                        <div className="draft-section-item">
+                          <h4>Goals & Objectives</h4>
+                          <p>{draft.goals_and_objectives || draft.impact_statement}</p>
+                        </div>
+                      )}
+                      {draft.program_design && (
+                        <div className="draft-section-item">
+                          <h4>Program Design & Methodology</h4>
+                          <p>{draft.program_design}</p>
+                        </div>
+                      )}
+                      {draft.evaluation_plan && (
+                        <div className="draft-section-item">
+                          <h4>Evaluation Plan</h4>
+                          <p>{draft.evaluation_plan}</p>
+                        </div>
+                      )}
+                      {draft.sustainability_plan && (
+                        <div className="draft-section-item">
+                          <h4>Sustainability Plan</h4>
+                          <p>{draft.sustainability_plan}</p>
+                        </div>
+                      )}
+                      {draft.budget_narrative && (
+                        <div className="draft-section-item">
+                          <h4>Budget Narrative</h4>
+                          <p>{draft.budget_narrative}</p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ) : (
@@ -800,6 +855,11 @@ export default function Dashboard({ orgProfile }) {
               />
             </div>
           </div>
+        )}
+
+        {/* Financials Vault */}
+        {showFinancialsVault && (
+          <FinancialsVault onClose={() => setShowFinancialsVault(false)} />
         )}
 
         {/* Bulk Job Monitor */}

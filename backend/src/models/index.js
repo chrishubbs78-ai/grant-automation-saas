@@ -21,6 +21,7 @@ const Analytics = require('./Analytics');
 const Template = require('./Template');
 const BulkJob = require('./BulkJob');
 const ReapplyCandidate = require('./ReapplyCandidate');
+const FinancialDocument = require('./FinancialDocument');
 
 // Initialize models
 const models = {
@@ -32,7 +33,8 @@ const models = {
   Analytics: Analytics(sequelize),
   Template: Template(sequelize),
   BulkJob: BulkJob(sequelize),
-  ReapplyCandidate: ReapplyCandidate(sequelize)
+  ReapplyCandidate: ReapplyCandidate(sequelize),
+  FinancialDocument: FinancialDocument(sequelize)
 };
 
 // Define associations

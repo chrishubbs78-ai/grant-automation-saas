@@ -122,6 +122,31 @@ router.post('/import-rfps', verifyToken, async (req, res) => {
   }
 });
 
+// GET /api/bulk/:jobId/download — download CSV export result
+router.get('/:jobId/download', verifyToken, async (req, res) => {
+  try {
+    const bulkJob = await BulkJob.findOne({ where: { id: req.params.jobId } });
+    if (!bulkJob) {
+      return res.status(404).json({ success: false, error: 'Bulk job not found' });
+    }
+
+    const org = await Organization.findOne({ where: { userId: req.user.userId } });
+    if (!org || bulkJob.org_id !== org.id) {
+      return res.status(403).json({ success: false, error: 'Unauthorized' });
+    }
+
+    if (bulkJob.operation_type !== 'bulk_export_csv' || bulkJob.status !== 'complete' || !bulkJob.metadata?.csv) {
+      return res.status(404).json({ success: false, error: 'No downloadable result for this job' });
+    }
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="grants_export_${bulkJob.id}.csv"`);
+    res.send(bulkJob.metadata.csv);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // GET /api/bulk/:jobId — poll status
 router.get('/:jobId', verifyToken, async (req, res) => {
   try {

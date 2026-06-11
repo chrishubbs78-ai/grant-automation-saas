@@ -1,10 +1,27 @@
 import React, { useState, useEffect } from 'react';
+import { getSocket } from '../services/socket';
 import './BulkJobMonitor.css';
 
 const BulkJobMonitor = ({ jobId, onComplete, onClose }) => {
   const [job, setJob] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Live progress via Socket.IO (instant updates between polls)
+  useEffect(() => {
+    const socket = getSocket();
+    const onProgress = (data) => {
+      if (data.jobId !== jobId) return;
+      setJob(prev => prev ? {
+        ...prev,
+        status: data.status === 'processing' ? prev.status : data.status,
+        processed_items: data.processed ?? prev.processed_items,
+        total_items: data.total ?? prev.total_items
+      } : prev);
+    };
+    socket.on('bulk:progress', onProgress);
+    return () => socket.off('bulk:progress', onProgress);
+  }, [jobId]);
 
   // Poll job status
   useEffect(() => {
@@ -96,9 +113,29 @@ const BulkJobMonitor = ({ jobId, onComplete, onClose }) => {
           <strong>✓ Operation Complete</strong>
           {job.result_url && (
             <div className="monitor-download">
-              <a href={job.result_url} download className="btn-download">
+              <button
+                className="btn-download"
+                onClick={async () => {
+                  try {
+                    const token = localStorage.getItem('token');
+                    const res = await fetch(`http://localhost:4006/api/bulk/${job.id}/download`, {
+                      headers: { Authorization: `Bearer ${token}` }
+                    });
+                    if (!res.ok) throw new Error('Download failed');
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `grants_export_${job.id}.csv`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  } catch (err) {
+                    setError(err.message);
+                  }
+                }}
+              >
                 📥 Download Result
-              </a>
+              </button>
             </div>
           )}
         </div>

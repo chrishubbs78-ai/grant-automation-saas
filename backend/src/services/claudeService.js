@@ -1,5 +1,5 @@
 const Anthropic = require('@anthropic-ai/sdk');
-const { getMockRFPAnalysis, getMockDraft } = require('./mockApiService');
+const { getMockRFPAnalysis, getMockDraft, getMockImprovedDraft } = require('./mockApiService');
 
 // Check for API key at initialization
 const CLAUDE_API_KEY = process.env.CLAUDE_API_KEY;
@@ -140,7 +140,81 @@ ${context}`
   }
 }
 
+// Generate an improved draft for a reapplication, learning from the rejection
+async function generateImprovedDraft({ orgProfile, rfpAnalysis, previousDraft, rejectionFeedback, recommendations }) {
+  // Use mock response if in demo mode or API key missing
+  if (USE_MOCK_API) {
+    console.log('[MOCK] Generating improved draft with mock Claude response...');
+    return getMockImprovedDraft({ orgProfile, rfpAnalysis, previousDraft, rejectionFeedback });
+  }
+
+  try {
+    const context = `
+ORGANIZATION PROFILE:
+Name: ${orgProfile.name || 'Unknown'}
+Mission: ${orgProfile.mission || 'Not provided'}
+Track Record: ${orgProfile.track_record || 'Not provided'}
+
+RFP ANALYSIS:
+Funder: ${rfpAnalysis.funder_name || 'Unknown'}
+Requirements: ${rfpAnalysis.requirements?.join('; ') || 'None specified'}
+Evaluation Criteria: ${JSON.stringify(rfpAnalysis.evaluation_criteria || {})}
+
+PREVIOUS (REJECTED) DRAFT:
+Problem Statement: ${previousDraft?.problem_statement || 'Not available'}
+Impact Statement: ${previousDraft?.impact_statement || 'Not available'}
+Budget Narrative: ${previousDraft?.budget_narrative || 'Not available'}
+
+REJECTION FEEDBACK:
+${rejectionFeedback || 'No specific feedback provided'}
+
+LEARNING ENGINE RECOMMENDATIONS:
+${(recommendations || []).map(r => `- ${r.message || r}`).join('\n') || 'None'}
+    `;
+
+    const message = await anthropic.messages.create({
+      model: MODEL,
+      max_tokens: 3000,
+      messages: [
+        {
+          role: 'user',
+          content: `A previous version of this grant proposal was REJECTED. Generate an improved version of the three draft sections that directly addresses the rejection feedback and the learning recommendations. Strengthen weak areas, fix anything the feedback criticized, and sharpen alignment with the evaluation criteria. Do NOT simply repeat the previous draft.
+
+Return ONLY valid JSON with this structure:
+{
+  "problem_statement": "improved 1-2 paragraph problem statement",
+  "impact_statement": "improved 1-2 paragraph impact statement",
+  "budget_narrative": "improved 2-3 paragraph budget justification",
+  "improvement_summary": "1 paragraph explaining what was changed and why"
+}
+
+CONTEXT:
+${context}`
+        }
+      ]
+    });
+
+    const responseText = message.content[0].text;
+
+    try {
+      return JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('Failed to parse Claude improved draft response:', responseText);
+      return {
+        problem_statement: previousDraft?.problem_statement || 'Draft improvement experienced an issue. Please revise manually.',
+        impact_statement: previousDraft?.impact_statement || 'Unable to generate this section.',
+        budget_narrative: previousDraft?.budget_narrative || 'Unable to generate this section.',
+        improvement_summary: 'Automatic improvement failed; previous draft retained.'
+      };
+    }
+  } catch (error) {
+    console.error('Claude improved draft generation error:', error);
+    throw new Error(`Improved draft generation failed: ${error.message}`);
+  }
+}
+
 module.exports = {
   parseRFP,
-  generateDraft
+  generateDraft,
+  generateImprovedDraft
 };

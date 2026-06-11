@@ -2,6 +2,7 @@ const express = require('express');
 const { verifyToken } = require('../middleware/auth');
 const { Organization, Outcome, Grant } = require('../models');
 const { computeAnalytics } = require('../services/learningEngine');
+const { createCandidateForGrant } = require('../services/reapplyService');
 const router = express.Router();
 
 // POST record outcome (grant funded/rejected)
@@ -55,11 +56,24 @@ router.post('/:grantId', verifyToken, async (req, res) => {
     // Recompute analytics for this org
     const analytics = await computeAnalytics(org.id);
 
+    // On rejection, queue this grant as a reapply candidate for the next cycle.
+    // Failure here must not block outcome recording.
+    let reapplyCandidate = null;
+    if (!funded) {
+      try {
+        const candidate = await createCandidateForGrant(grant, outcome, org.id);
+        reapplyCandidate = candidate.get({ plain: true });
+      } catch (reapplyError) {
+        console.error('Failed to create reapply candidate:', reapplyError);
+      }
+    }
+
     res.json({
       success: true,
       data: {
         outcome: outcome.get({ plain: true }),
-        analytics
+        analytics,
+        reapplyCandidate
       }
     });
   } catch (error) {

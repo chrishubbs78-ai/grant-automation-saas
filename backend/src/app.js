@@ -47,6 +47,7 @@ app.use('/api/rfp', require('./routes/rfp'));
 app.use('/api/draft', require('./routes/drafts'));
 app.use('/api/outcomes', require('./routes/outcomes'));
 app.use('/api/analytics', require('./routes/analytics'));
+app.use('/api/reapply', require('./routes/reapply'));
 
 // Health check
 app.get('/health', (req, res) => {
@@ -87,6 +88,10 @@ async function startServer() {
 
     // Check for required API keys
     logKeyStatus();
+
+    // Start background auto-reapply checks
+    const { startReapplyScheduler } = require('./services/reapplyScheduler');
+    startReapplyScheduler();
 
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);

@@ -216,8 +216,27 @@ function getMockDraft({ orgProfile, rfpAnalysis }) {
   };
 }
 
+// Mock improved draft for reapplications
+function getMockImprovedDraft({ orgProfile, rfpAnalysis, previousDraft, rejectionFeedback }) {
+  const base = getMockDraft({ orgProfile: orgProfile || {}, rfpAnalysis: rfpAnalysis || {} });
+  const feedbackNote = rejectionFeedback
+    ? `Directly responding to prior reviewer feedback ("${String(rejectionFeedback).substring(0, 120)}"), this revision strengthens the evidence base and clarifies measurable outcomes. `
+    : 'This revision strengthens the evidence base and clarifies measurable outcomes compared to the prior submission. ';
+
+  return {
+    problem_statement: feedbackNote + base.problem_statement,
+    impact_statement: base.impact_statement +
+      ' This revised proposal adds quarterly milestone reporting and an independent evaluation partner to address concerns raised in the previous review cycle.',
+    budget_narrative: base.budget_narrative +
+      ' Compared to our previous submission, this budget has been re-justified line by line with benchmarking data from comparable funded programs.',
+    improvement_summary: 'Revised to address rejection feedback: tightened the problem statement with stronger evidence, ' +
+      'added concrete evaluation milestones to the impact statement, and benchmarked the budget against comparable funded programs.'
+  };
+}
+
 module.exports = {
   getMockRFPAnalysis,
   getMockFunderResearch,
-  getMockDraft
+  getMockDraft,
+  getMockImprovedDraft
 };

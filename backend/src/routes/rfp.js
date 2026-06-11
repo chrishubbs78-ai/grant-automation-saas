@@ -5,6 +5,7 @@ const { Organization, Grant, RFPAnalysis } = require('../models');
 const { parseRFP } = require('../services/claudeService');
 const { researchFunder } = require('../services/geminiService');
 const { extractTextFromBase64, truncateForClaude } = require('../services/fileParserService');
+const { emitToUser } = require('../services/socketService');
 const logger = require('../utils/logger');
 const router = express.Router();
 
@@ -51,19 +52,13 @@ router.post('/upload', largeJsonParser, verifyToken, async (req, res) => {
     }
 
     const jobId = uuidv4();
-    jobStatus.set(jobId, {
-      status: 'processing',
-      progress: 10,
-      orgId: org.id
-    });
+    const userId = req.user.userId;
+    jobStatus.set(jobId, { status: 'processing', progress: 10, orgId: org.id });
 
     // Start async processing
-    processRFP(jobId, rfpText, org.id).catch(error => {
-      jobStatus.set(jobId, {
-        status: 'error',
-        error: error.message,
-        orgId: org.id
-      });
+    processRFP(jobId, rfpText, org.id, userId).catch(error => {
+      jobStatus.set(jobId, { status: 'error', error: error.message, orgId: org.id });
+      emitToUser(userId, 'rfp:error', { jobId, error: error.message });
     });
 
     res.json({
@@ -138,23 +133,17 @@ router.get('/:jobId', verifyToken, async (req, res) => {
 });
 
 // Background job: Process RFP (parse + research)
-async function processRFP(jobId, rfpText, orgId) {
+async function processRFP(jobId, rfpText, orgId, userId) {
   try {
-    jobStatus.set(jobId, {
-      status: 'processing',
-      progress: 20,
-      orgId
-    });
+    jobStatus.set(jobId, { status: 'processing', progress: 20, orgId });
+    emitToUser(userId, 'rfp:progress', { jobId, progress: 20, status: 'processing' });
 
     // Step 1: Parse RFP with Claude
     logger.info({ jobId, orgId }, 'Parsing RFP with Claude...');
     const rfpAnalysis = await parseRFP(rfpText);
 
-    jobStatus.set(jobId, {
-      status: 'processing',
-      progress: 50,
-      orgId
-    });
+    jobStatus.set(jobId, { status: 'processing', progress: 50, orgId });
+    emitToUser(userId, 'rfp:progress', { jobId, progress: 50, status: 'processing' });
 
     // Step 2: Research funder with Gemini
     logger.info({ jobId, funder: rfpAnalysis.funder_name }, 'Researching funder with Gemini...');
@@ -171,11 +160,8 @@ async function processRFP(jobId, rfpText, orgId) {
       }
     }
 
-    jobStatus.set(jobId, {
-      status: 'processing',
-      progress: 80,
-      orgId
-    });
+    jobStatus.set(jobId, { status: 'processing', progress: 80, orgId });
+    emitToUser(userId, 'rfp:progress', { jobId, progress: 80, status: 'processing' });
 
     // Step 3: Store in database
     const grant = await Grant.create({
@@ -199,23 +185,14 @@ async function processRFP(jobId, rfpText, orgId) {
       research_summary: research
     });
 
-    jobStatus.set(jobId, {
-      status: 'complete',
-      progress: 100,
-      orgId,
-      rfpAnalysis,
-      research,
-      grantId: grant.id
-    });
+    jobStatus.set(jobId, { status: 'complete', progress: 100, orgId, rfpAnalysis, research, grantId: grant.id });
+    emitToUser(userId, 'rfp:complete', { jobId, rfpAnalysis, grantId: grant.id });
 
     logger.info({ jobId, grantId: grant.id }, 'RFP analysis complete');
   } catch (error) {
     logger.error({ jobId, error: error.message }, 'Error processing RFP');
-    jobStatus.set(jobId, {
-      status: 'error',
-      error: error.message,
-      orgId
-    });
+    jobStatus.set(jobId, { status: 'error', error: error.message, orgId });
+    emitToUser(userId, 'rfp:error', { jobId, error: error.message });
   }
 }
 

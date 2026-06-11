@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import RFPUploader from './RFPUploader';
 import SearchFilter from './SearchFilter';
 import TemplateManager from './TemplateManager';
@@ -6,6 +6,7 @@ import BulkActionsToolbar from './BulkActionsToolbar';
 import BulkJobMonitor from './BulkJobMonitor';
 import FinancialsVault from './FinancialsVault';
 import ReapplyQueue from './ReapplyQueue';
+import { connectSocket, disconnectSocket, getUserIdFromToken } from '../services/socket';
 import '../styles/dashboard.css';
 
 export default function Dashboard({ orgProfile }) {
@@ -55,6 +56,10 @@ export default function Dashboard({ orgProfile }) {
   const [showTemplateManager, setShowTemplateManager] = useState(false);
   const [showFinancialsVault, setShowFinancialsVault] = useState(false);
 
+  // Track active job IDs so socket events only apply to the current job
+  const activeRfpJobId = useRef(null);
+  const activeDraftJobId = useRef(null);
+
   // Bulk operations state
   const [selectedGrants, setSelectedGrants] = useState(new Set());
   const [currentBulkJobId, setCurrentBulkJobId] = useState(null);
@@ -62,6 +67,68 @@ export default function Dashboard({ orgProfile }) {
   useEffect(() => {
     fetchGrants();
     fetchAnalytics();
+  }, []);
+
+  // Socket.IO — real-time job progress (supplements existing polling)
+  useEffect(() => {
+    const userId = getUserIdFromToken();
+    if (!userId) return;
+
+    const socket = connectSocket(userId);
+
+    socket.on('rfp:progress', ({ jobId, progress }) => {
+      if (jobId === activeRfpJobId.current) {
+        setJobStatus('processing');
+      }
+    });
+
+    socket.on('rfp:complete', ({ jobId, rfpAnalysis }) => {
+      if (jobId === activeRfpJobId.current) {
+        setRfpAnalysis(rfpAnalysis);
+        setJobStatus('complete');
+        setPolling(false);
+        setPollingError(null);
+      }
+    });
+
+    socket.on('rfp:error', ({ jobId, error }) => {
+      if (jobId === activeRfpJobId.current) {
+        setPollingError(error);
+        setJobStatus('error');
+        setPolling(false);
+      }
+    });
+
+    socket.on('draft:progress', ({ jobId }) => {
+      if (jobId === activeDraftJobId.current) {
+        setDraftStatus('processing');
+      }
+    });
+
+    socket.on('draft:complete', ({ jobId, draft }) => {
+      if (jobId === activeDraftJobId.current) {
+        setDraft(draft);
+        setDraftStatus('complete');
+        setDraftPolling(false);
+      }
+    });
+
+    socket.on('draft:error', ({ jobId }) => {
+      if (jobId === activeDraftJobId.current) {
+        setDraftStatus('error');
+        setDraftPolling(false);
+      }
+    });
+
+    return () => {
+      socket.off('rfp:progress');
+      socket.off('rfp:complete');
+      socket.off('rfp:error');
+      socket.off('draft:progress');
+      socket.off('draft:complete');
+      socket.off('draft:error');
+      disconnectSocket();
+    };
   }, []);
 
   // Poll RFP job status
@@ -240,6 +307,7 @@ export default function Dashboard({ orgProfile }) {
 
   const handleUploadComplete = (uploadData) => {
     setJobId(uploadData.jobId);
+    activeRfpJobId.current = uploadData.jobId;
     setJobStatus('processing');
     setPolling(true);
     setPollingError(null);
@@ -265,6 +333,7 @@ export default function Dashboard({ orgProfile }) {
       const json = await res.json();
       if (json.success) {
         setDraftJobId(json.data.jobId);
+        activeDraftJobId.current = json.data.jobId;
         setDraftStatus('processing');
         setDraftPolling(true);
       } else {

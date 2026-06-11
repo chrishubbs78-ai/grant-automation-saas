@@ -3,6 +3,7 @@ const { v4: uuidv4 } = require('uuid');
 const { verifyToken } = require('../middleware/auth');
 const { Organization, Grant, RFPAnalysis, Draft, Analytics } = require('../models');
 const { generateDraft } = require('../services/claudeService');
+const { emitToUser } = require('../services/socketService');
 const logger = require('../utils/logger');
 const router = express.Router();
 
@@ -42,19 +43,13 @@ router.post('/generate', verifyToken, async (req, res) => {
     }
 
     const jobId = uuidv4();
-    jobStatus.set(jobId, {
-      status: 'processing',
-      progress: 10,
-      orgId: org.id
-    });
+    const userId = req.user.userId;
+    jobStatus.set(jobId, { status: 'processing', progress: 10, orgId: org.id });
 
     // Start async draft generation
-    processDraft(jobId, rfpAnalysisId, org.id, org).catch(error => {
-      jobStatus.set(jobId, {
-        status: 'error',
-        error: error.message,
-        orgId: org.id
-      });
+    processDraft(jobId, rfpAnalysisId, org.id, org, userId).catch(error => {
+      jobStatus.set(jobId, { status: 'error', error: error.message, orgId: org.id });
+      emitToUser(userId, 'draft:error', { jobId, error: error.message });
     });
 
     res.json({
@@ -128,13 +123,10 @@ router.get('/:jobId', verifyToken, async (req, res) => {
 });
 
 // Background job: Generate draft
-async function processDraft(jobId, rfpAnalysisId, orgId, org) {
+async function processDraft(jobId, rfpAnalysisId, orgId, org, userId) {
   try {
-    jobStatus.set(jobId, {
-      status: 'processing',
-      progress: 20,
-      orgId
-    });
+    jobStatus.set(jobId, { status: 'processing', progress: 20, orgId });
+    emitToUser(userId, 'draft:progress', { jobId, progress: 20, status: 'processing' });
 
     const rfp = await RFPAnalysis.findByPk(rfpAnalysisId);
 
@@ -142,11 +134,8 @@ async function processDraft(jobId, rfpAnalysisId, orgId, org) {
       throw new Error('RFP not found');
     }
 
-    jobStatus.set(jobId, {
-      status: 'processing',
-      progress: 40,
-      orgId
-    });
+    jobStatus.set(jobId, { status: 'processing', progress: 40, orgId });
+    emitToUser(userId, 'draft:progress', { jobId, progress: 40, status: 'processing' });
 
     // Pull learning analytics to feed into draft generation
     const analytics = await Analytics.findOne({ where: { org_id: orgId } });
@@ -159,11 +148,8 @@ async function processDraft(jobId, rfpAnalysisId, orgId, org) {
       analytics: analytics ? analytics.get({ plain: true }) : null
     });
 
-    jobStatus.set(jobId, {
-      status: 'processing',
-      progress: 80,
-      orgId
-    });
+    jobStatus.set(jobId, { status: 'processing', progress: 80, orgId });
+    emitToUser(userId, 'draft:progress', { jobId, progress: 80, status: 'processing' });
 
     // Store all 8 draft sections in database
     const draftRecord = await Draft.create({
@@ -184,21 +170,15 @@ async function processDraft(jobId, rfpAnalysisId, orgId, org) {
       sustainability_plan: draft.sustainability_plan || ''
     });
 
-    jobStatus.set(jobId, {
-      status: 'complete',
-      progress: 100,
-      orgId,
-      draft: draftRecord.get({ plain: true })
-    });
+    const draftPlain = draftRecord.get({ plain: true });
+    jobStatus.set(jobId, { status: 'complete', progress: 100, orgId, draft: draftPlain });
+    emitToUser(userId, 'draft:complete', { jobId, draft: draftPlain });
 
     logger.info({ jobId }, 'Draft generation complete');
   } catch (error) {
     logger.error({ jobId, error: error.message }, 'Error generating draft');
-    jobStatus.set(jobId, {
-      status: 'error',
-      error: error.message,
-      orgId
-    });
+    jobStatus.set(jobId, { status: 'error', error: error.message, orgId });
+    emitToUser(userId, 'draft:error', { jobId, error: error.message });
   }
 }
 

@@ -100,6 +100,21 @@ export async function runRenderJob(jobId) {
       offset: w.offset ?? 0,
     }));
 
+    // B-roll cutaways placed in the editor
+    const brollProps = [];
+    for (const b of mapRow?.data?.broll ?? []) {
+      const asset = assets.find((a) => a.id === b.assetId);
+      if (!asset) continue;
+      const p = await download(asset, `broll_${b.id}${extOf(asset.storage_path)}`);
+      brollProps.push({
+        src: p,
+        isStill: (asset.mime_type ?? "").startsWith("image/"),
+        start: b.start,
+        duration: b.duration,
+        kenBurns: b.kenBurns ?? false,
+      });
+    }
+
     // ---- Remotion bundle + render (video only) ----------------------------
     await progress(20, "bundle", "bundling composition");
     const entry = resolve(__dirname, "../../apps/web/remotion/index.ts");
@@ -108,7 +123,7 @@ export async function runRenderJob(jobId) {
       webpackOverride: (c) => c,
     });
 
-    const inputProps = { audioSrc: null, clips: clipProps, broll: [], words, watermark };
+    const inputProps = { audioSrc: null, clips: clipProps, broll: brollProps, words, watermark };
     const composition = await selectComposition({
       serveUrl: bundled,
       id: "MusicVideo",

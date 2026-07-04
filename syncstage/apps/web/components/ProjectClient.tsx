@@ -89,6 +89,7 @@ export function ProjectClient({
   const face = assets.find(
     (a) => a.kind === "face_photo" || a.kind === "face_video"
   );
+  const brollAssets = assets.filter((a) => a.kind === "broll");
   const analysis = assets.find((a) => a.kind === "analysis");
   const avatarClips = assets.filter((a) => a.kind === "avatar_clip");
   const finalRender = assets.find((a) => a.kind === "final_render");
@@ -97,7 +98,10 @@ export function ProjectClient({
     (j) => j.status === "queued" || j.status === "running"
   );
 
-  async function handleUpload(kind: "song" | "face_photo" | "face_video", file: File) {
+  async function handleUpload(
+    kind: "song" | "face_photo" | "face_video" | "broll",
+    file: File
+  ) {
     setUploading(kind);
     setError(null);
     try {
@@ -125,10 +129,12 @@ export function ProjectClient({
     }
   }
 
+  const [preset, setPreset] = useState<"16:9" | "9:16" | "1:1">("16:9");
+
   async function renderFinal() {
     setError(null);
     try {
-      await enqueueJob(project.id, "final_render", { preset: "16:9" });
+      await enqueueJob(project.id, "final_render", { preset });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -243,14 +249,48 @@ export function ProjectClient({
               Download MP4
             </button>
           ) : (
-            <button
-              className="btn-secondary"
-              disabled={avatarClips.length === 0 || !!activeJob}
-              onClick={renderFinal}
-            >
-              Render 1080p MP4
-            </button>
+            <div className="flex items-center gap-2">
+              <select
+                className="input !w-24"
+                value={preset}
+                onChange={(e) => setPreset(e.target.value as typeof preset)}
+              >
+                <option value="16:9">16:9</option>
+                <option value="9:16">9:16</option>
+                <option value="1:1">1:1</option>
+              </select>
+              <button
+                className="btn-secondary"
+                disabled={avatarClips.length === 0 || !!activeJob}
+                onClick={renderFinal}
+              >
+                Render 1080p MP4
+              </button>
+            </div>
           )}
+        </section>
+
+        {/* B-roll library */}
+        <section className="card sm:col-span-2">
+          <h2 className="mb-2 font-semibold text-white">
+            B-roll <span className="text-xs font-normal text-zinc-500">(optional cutaways, placed in the editor)</span>
+          </h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <UploadButton
+              accept="image/*,video/*"
+              label={uploading === "broll" ? "Uploading…" : "+ Add b-roll clip or photo"}
+              disabled={uploading !== null}
+              onFile={(f) => handleUpload("broll", f)}
+            />
+            {brollAssets.map((a) => (
+              <span
+                key={a.id}
+                className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-300"
+              >
+                {a.storage_path.split("/").pop()}
+              </span>
+            ))}
+          </div>
         </section>
       </div>
 

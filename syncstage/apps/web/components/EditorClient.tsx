@@ -6,7 +6,11 @@ import { AnalysisResult, AlignmentMap } from "@syncstage/shared";
 import { createClient } from "@/lib/supabase/client";
 import { signedUrl } from "@/lib/storage";
 import { enqueueJob } from "@/lib/jobs";
-import { useEditorStore, type ClipInfo } from "@/lib/editorStore";
+import {
+  useEditorStore,
+  type BrollAssetInfo,
+  type ClipInfo,
+} from "@/lib/editorStore";
 import { Timeline } from "@/components/timeline/Timeline";
 import { PlayerPreview } from "@/components/PlayerPreview";
 
@@ -15,6 +19,7 @@ type AssetRow = {
   kind: string;
   bucket: string;
   storage_path: string;
+  mime_type: string | null;
   range: { start: number; end: number } | null;
   created_at: string;
 };
@@ -78,6 +83,17 @@ export function EditorClient({
           }))
         );
 
+        const brollAssets: BrollAssetInfo[] = await Promise.all(
+          assets
+            .filter((a) => a.kind === "broll")
+            .map(async (a) => ({
+              assetId: a.id,
+              url: await signedUrl(a.bucket, a.storage_path),
+              isStill: (a.mime_type ?? "").startsWith("image/"),
+              name: a.storage_path.split("/").pop() ?? "b-roll",
+            }))
+        );
+
         let map: AlignmentMap | null = null;
         if (alignmentRow) {
           const parsed = AlignmentMap.safeParse(alignmentRow.data);
@@ -85,7 +101,7 @@ export function EditorClient({
         }
 
         if (cancelled) return;
-        store.init({ projectId: project.id, analysis, map, clips });
+        store.init({ projectId: project.id, analysis, map, clips, brollAssets });
         setMixUrl(songUrl);
         setVocalUrl(vocalStemUrl);
         setLoading(false);
@@ -117,6 +133,36 @@ export function EditorClient({
     return () => cancelAnimationFrame(raf);
   }, [mixUrl]);
 
+  // Keyboard shortcuts: space = play/pause, ←/→ = nudge selected word by
+  // 10ms (Shift: 100ms), Delete = remove selected b-roll, Esc = deselect.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") return;
+      const s = useEditorStore.getState();
+      if (e.code === "Space") {
+        e.preventDefault();
+        togglePlay();
+      } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        if (!s.selectedWordId) return;
+        e.preventDefault();
+        const step = (e.shiftKey ? 0.1 : 0.01) * (e.key === "ArrowLeft" ? -1 : 1);
+        s.nudgeWord(s.selectedWordId, step);
+      } else if (e.key === "Delete" || e.key === "Backspace") {
+        if (s.selectedBrollId) {
+          e.preventDefault();
+          s.removeBroll(s.selectedBrollId);
+        }
+      } else if (e.key === "Escape") {
+        s.selectWord(null);
+        s.selectBroll(null);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function togglePlay() {
     const el = audioRef.current;
     if (!el) return;
@@ -147,7 +193,7 @@ export function EditorClient({
       version: store.savedVersion + 1,
       project_id: store.projectId,
       words: store.words,
-      broll: [],
+      broll: store.broll,
       dirtyRanges: store.dirtyRanges,
     };
     const { error } = await supabase.from("alignment_maps").upsert({
@@ -227,6 +273,9 @@ export function EditorClient({
         <span className="font-mono text-xs text-zinc-400">
           {formatTime(store.currentTime)} / {formatTime(store.duration)}
         </span>
+        {store.brollAssets.length > 0 && (
+          <BrollPicker />
+        )}
         <div className="ml-auto flex items-center gap-2 text-xs text-zinc-400">
           <label className="flex items-center gap-1">
             <input
@@ -267,4 +316,36 @@ function formatTime(t: number): string {
   const m = Math.floor(t / 60);
   const s = (t % 60).toFixed(1).padStart(4, "0");
   return `${m}:${s}`;
+}
+
+/** Pick an uploaded b-roll asset and drop it on the lane at the playhead. */
+function BrollPicker() {
+  const { brollAssets } = useEditorStore();
+  const [assetId, setAssetId] = useState(brollAssets[0]?.assetId ?? "");
+
+  return (
+    <div className="flex items-center gap-1 text-xs">
+      <select
+        className="input !w-40 !py-1"
+        value={assetId}
+        onChange={(e) => setAssetId(e.target.value)}
+      >
+        {brollAssets.map((a) => (
+          <option key={a.assetId} value={a.assetId}>
+            {a.isStill ? "🖼 " : "🎞 "}
+            {a.name}
+          </option>
+        ))}
+      </select>
+      <button
+        className="btn-secondary !py-1 text-xs"
+        onClick={() => {
+          const s = useEditorStore.getState();
+          if (assetId) s.addBroll(assetId, s.currentTime);
+        }}
+      >
+        + B-roll at playhead
+      </button>
+    </div>
+  );
 }

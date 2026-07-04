@@ -48,6 +48,43 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
   }
 
+  // ---- Cost controls (Phase 3) --------------------------------------------
+  // 1. Cap concurrent queued/running jobs per user so a stuck client can't
+  //    fan out GPU work.
+  const { count: activeCount } = await supabase
+    .from("jobs")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id)
+    .in("status", ["queued", "running"]);
+  const maxActive = Number(process.env.MAX_ACTIVE_JOBS_PER_USER ?? 5);
+  if ((activeCount ?? 0) >= maxActive) {
+    return NextResponse.json(
+      { error: `Too many jobs in flight (limit ${maxActive}). Wait for one to finish.` },
+      { status: 429 }
+    );
+  }
+
+  // 2. Monthly final-render quota (free-tier control).
+  if (type === "final_render") {
+    const monthStart = new Date();
+    monthStart.setUTCDate(1);
+    monthStart.setUTCHours(0, 0, 0, 0);
+    const { count: renderCount } = await supabase
+      .from("jobs")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("type", "final_render")
+      .neq("status", "failed")
+      .gte("created_at", monthStart.toISOString());
+    const monthlyLimit = Number(process.env.RENDER_MONTHLY_LIMIT ?? 20);
+    if ((renderCount ?? 0) >= monthlyLimit) {
+      return NextResponse.json(
+        { error: `Monthly render limit reached (${monthlyLimit}).` },
+        { status: 429 }
+      );
+    }
+  }
+
   const { data: job, error: insertError } = await supabase
     .from("jobs")
     .insert({

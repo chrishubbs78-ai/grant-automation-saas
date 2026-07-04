@@ -13,7 +13,8 @@ import { useEditorStore } from "@/lib/editorStore";
  */
 export function PlayerPreview({ mixUrl }: { mixUrl: string | null }) {
   const playerRef = useRef<PlayerRef>(null);
-  const { words, clips, duration, currentTime, playing } = useEditorStore();
+  const { words, clips, broll, brollAssets, duration, currentTime, playing } =
+    useEditorStore();
 
   const inputProps: MusicVideoProps = useMemo(
     () => ({
@@ -21,7 +22,19 @@ export function PlayerPreview({ mixUrl }: { mixUrl: string | null }) {
       clips: clips
         .filter((c) => c.url)
         .map((c) => ({ src: c.url!, start: c.range.start, end: c.range.end })),
-      broll: [],
+      broll: broll.flatMap((b) => {
+        const asset = brollAssets.find((a) => a.assetId === b.assetId);
+        if (!asset) return [];
+        return [
+          {
+            src: asset.url,
+            isStill: asset.isStill,
+            start: b.start,
+            duration: b.duration,
+            kenBurns: b.kenBurns,
+          },
+        ];
+      }),
       words: words.map((w) => ({
         text: w.text,
         start: w.start,
@@ -30,7 +43,7 @@ export function PlayerPreview({ mixUrl }: { mixUrl: string | null }) {
       })),
       watermark: false,
     }),
-    [clips, words]
+    [clips, words, broll, brollAssets]
   );
 
   // Follow the transport.

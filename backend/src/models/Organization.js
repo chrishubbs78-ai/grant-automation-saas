@@ -174,6 +174,24 @@ module.exports = (sequelize) => {
       defaultValue: [],
       comment: 'Array of { funder_name, amount, year, purpose }'
     },
+    // Business plan
+    businessPlan: {
+      type: DataTypes.JSONB,
+      defaultValue: {},
+      comment: 'Structured business plan sections: { executive_summary, products_and_programs, market_analysis, marketing_outreach, operations_plan, growth_strategy, financial_projections, funding_strategy, risks_and_mitigation }'
+    },
+    businessPlanText: {
+      type: DataTypes.TEXT,
+      comment: 'Full text extracted from an uploaded business plan document'
+    },
+    businessPlanFileName: {
+      type: DataTypes.STRING(255),
+      comment: 'Original filename of the uploaded business plan'
+    },
+    businessPlanUploadedAt: {
+      type: DataTypes.DATE,
+      comment: 'When the business plan document was last uploaded'
+    },
     questionnaire: {
       type: DataTypes.JSONB,
       defaultValue: {},

@@ -161,13 +161,11 @@ async function executeReapply(candidateId, orgId) {
     notes: `Reapplication of grant ${originalGrant.id} (rejected). Auto-generated improved draft.`
   });
 
-  // Generate an improved draft using the rejection as a learning signal
+  // Generate an improved draft using the rejection as a learning signal.
+  // Pass the full profile — buildOrgContext uses programs, outcomes, financials,
+  // and the business plan, not just name/mission.
   const improvedDraft = await generateImprovedDraft({
-    orgProfile: {
-      name: org.name,
-      mission: org.mission,
-      track_record: org.trackRecord
-    },
+    orgProfile: org.get({ plain: true }),
     rfpAnalysis: originalGrant.rfp_analysis || {},
     previousDraft: context.previousDraft,
     rejectionFeedback: context.rejectionFeedback,

@@ -1,8 +1,20 @@
 const { bulkQueue } = require('../queues');
 const { BulkJob, Grant, Organization } = require('../models');
-const { Parser } = require('json2csv');
 const { emitToUser } = require('../services/socketService');
 const logger = require('../utils/logger');
+
+// RFC 4180-style CSV: quote fields containing commas, quotes, or newlines
+function csvEscape(value) {
+  if (value === null || value === undefined) return '';
+  const str = String(value);
+  return /[",\r\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+}
+
+function toCsv(fields, rows) {
+  const header = fields.map(csvEscape).join(',');
+  const lines = rows.map(row => fields.map(f => csvEscape(row[f])).join(','));
+  return [header, ...lines].join('\n');
+}
 
 function emitProgress(userId, jobId, status, processed, total) {
   emitToUser(userId, 'bulk:progress', { jobId, status, processed, total });
@@ -45,8 +57,7 @@ async function processExportCSV(bulkJob, grants, userId) {
       created_at: g.created_at
     }));
 
-    const parser = new Parser({ fields });
-    const csv = parser.parse(data);
+    const csv = toCsv(fields, data);
 
     bulkJob.result_url = `/api/bulk/${bulkJob.id}/download`;
     bulkJob.status = 'complete';

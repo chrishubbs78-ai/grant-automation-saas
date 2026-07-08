@@ -38,6 +38,23 @@
   background: #e0e0e0;
 }
 
+.btn-edit-profile {
+  padding: 9px 18px;
+  background: white;
+  color: #2563eb;
+  border: 1px solid #2563eb;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.btn-edit-profile:hover {
+  background: #eff6ff;
+}
+
 .dashboard-main {
   padding: 40px;
   max-width: 1200px;

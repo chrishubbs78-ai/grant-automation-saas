@@ -1,5 +1,19 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import '../styles/questionnaire.css';
+
+const API = 'http://localhost:4006';
+
+const BLANK_BUSINESS_PLAN = {
+  executive_summary: '',
+  products_and_programs: '',
+  market_analysis: '',
+  marketing_outreach: '',
+  operations_plan: '',
+  growth_strategy: '',
+  financial_projections: '',
+  funding_strategy: '',
+  risks_and_mitigation: ''
+};
 
 const BLANK = {
   // Section 1: Identity
@@ -32,14 +46,24 @@ const BLANK = {
   previousGrantors: [{ funder_name: '', amount: '', year: '', purpose: '' }],
   partnerships: [],
   constraints: {},
-  questionnaire: {}
+  questionnaire: {},
+  // Section 10: Business Plan
+  businessPlan: { ...BLANK_BUSINESS_PLAN }
 };
 
 export default function OrgQuestionnaireForm({ onSubmit, initialData }) {
-  const merged = { ...BLANK, ...initialData };
+  const merged = {
+    ...BLANK,
+    ...initialData,
+    businessPlan: { ...BLANK_BUSINESS_PLAN, ...(initialData?.businessPlan || {}) }
+  };
   const [formData, setFormData] = useState(merged);
   const [activeSection, setActiveSection] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [planUploading, setPlanUploading] = useState(false);
+  const [planUploadMsg, setPlanUploadMsg] = useState(null);
+  const [planUploadError, setPlanUploadError] = useState(null);
+  const planFileRef = useRef();
 
   const SECTIONS = [
     'Organization Identity',
@@ -50,7 +74,8 @@ export default function OrgQuestionnaireForm({ onSubmit, initialData }) {
     'Team & Governance',
     'Financials',
     'Sustainability & DEI',
-    'Previous Funders & Partnerships'
+    'Previous Funders & Partnerships',
+    'Business Plan'
   ];
 
   const set = (field, value) => setFormData(prev => ({ ...prev, [field]: value }));
@@ -72,6 +97,53 @@ export default function OrgQuestionnaireForm({ onSubmit, initialData }) {
     setSaving(false);
   };
 
+  // Upload a business plan document — the backend extracts the text, AI-parses
+  // it, and returns structured sections that pre-fill the fields below.
+  const handlePlanUpload = () => {
+    const file = planFileRef.current?.files?.[0];
+    if (!file) return setPlanUploadError('Please choose a file first.');
+    const MAX_MB = 15;
+    if (file.size > MAX_MB * 1024 * 1024) return setPlanUploadError(`File must be under ${MAX_MB} MB.`);
+
+    setPlanUploading(true);
+    setPlanUploadError(null);
+    setPlanUploadMsg(null);
+
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      try {
+        const base64 = ev.target.result.split(',')[1];
+        const res = await fetch(`${API}/api/org/business-plan/upload`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({ file_name: file.name, mime_type: file.type, file_data: base64 })
+        });
+        const json = await res.json();
+        if (json.success) {
+          setFormData(prev => ({
+            ...prev,
+            businessPlan: { ...prev.businessPlan, ...json.data.businessPlan }
+          }));
+          setPlanUploadMsg(`"${file.name}" analyzed — the sections below were filled in from your plan. Review and edit them, then save.`);
+          planFileRef.current.value = '';
+        } else if (res.status === 404) {
+          setPlanUploadError('Save your profile first (use "Save Progress" below), then upload your business plan.');
+        } else {
+          setPlanUploadError(json.error || 'Upload failed. Please try again.');
+        }
+      } catch {
+        setPlanUploadError('Upload failed. Is the server running?');
+      } finally {
+        setPlanUploading(false);
+      }
+    };
+    reader.onerror = () => { setPlanUploadError('Could not read the file.'); setPlanUploading(false); };
+    reader.readAsDataURL(file);
+  };
+
   const completionPct = Math.round(
     (SECTIONS.length - SECTIONS.filter((_, i) => !sectionHasData(i)).length) / SECTIONS.length * 100
   );
@@ -86,7 +158,8 @@ export default function OrgQuestionnaireForm({ onSubmit, initialData }) {
       () => (formData.keyStaff || []).some(s => s.name),
       () => formData.annualBudget,
       () => formData.sustainabilityPlan,
-      () => (formData.previousGrantors || []).some(g => g.funder_name)
+      () => (formData.previousGrantors || []).some(g => g.funder_name),
+      () => Object.values(formData.businessPlan || {}).some(v => v && String(v).trim())
     ];
     return checks[idx] && checks[idx]();
   }
@@ -524,6 +597,90 @@ export default function OrgQuestionnaireForm({ onSubmit, initialData }) {
               <button type="button" className="btn-add" onClick={() => addItem('previousGrantors', { funder_name: '', amount: '', year: '', purpose: '' })}>
                 + Add Funder
               </button>
+            </section>
+          )}
+
+          {/* ── SECTION 9: Business Plan ── */}
+          {activeSection === 9 && (
+            <section className="form-section">
+              <h2>10. Business Plan</h2>
+              <p className="section-tip">Your business plan tells funders you think like an operator, not just a program. Upload your existing plan and we'll read it and fill in the sections below automatically — or answer the questions directly.</p>
+
+              <div className="plan-upload-box">
+                <label>Upload your business plan (PDF, DOCX, or TXT — max 15 MB)</label>
+                <div className="plan-upload-row">
+                  <input type="file" ref={planFileRef} accept=".pdf,.doc,.docx,.txt,.md" className="file-input" />
+                  <button type="button" className="btn-primary" onClick={handlePlanUpload} disabled={planUploading}>
+                    {planUploading ? 'Analyzing plan…' : 'Upload & Auto-Fill'}
+                  </button>
+                </div>
+                {planUploadMsg && <p className="plan-upload-success">✓ {planUploadMsg}</p>}
+                {planUploadError && <p className="plan-upload-error">{planUploadError}</p>}
+                <p className="form-help">The full document is stored with your profile and used as context when drafts are generated. Uploading again re-analyzes and updates the sections below.</p>
+              </div>
+
+              <div className="form-group">
+                <label>Executive Summary</label>
+                <textarea value={formData.businessPlan?.executive_summary || ''} onChange={e => setNested('businessPlan', 'executive_summary', e.target.value)}
+                  placeholder="The 30-second version of your plan: what you do, who you serve, why it works, and where you're headed in the next 3-5 years."
+                  rows={4} />
+              </div>
+
+              <div className="form-group">
+                <label>Products, Programs & Services</label>
+                <textarea value={formData.businessPlan?.products_and_programs || ''} onChange={e => setNested('businessPlan', 'products_and_programs', e.target.value)}
+                  placeholder="What you offer and how it's delivered — your core 'product lines' as an organization."
+                  rows={3} />
+              </div>
+
+              <div className="form-group">
+                <label>Market / Community Analysis</label>
+                <textarea value={formData.businessPlan?.market_analysis || ''} onChange={e => setNested('businessPlan', 'market_analysis', e.target.value)}
+                  placeholder="The demand for what you do: size of the need, who else serves this population, and what makes your position defensible."
+                  rows={3} />
+              </div>
+
+              <div className="form-group">
+                <label>Marketing & Outreach Strategy</label>
+                <textarea value={formData.businessPlan?.marketing_outreach || ''} onChange={e => setNested('businessPlan', 'marketing_outreach', e.target.value)}
+                  placeholder="How participants, clients, or customers find you — referral partners, community channels, digital presence."
+                  rows={3} />
+              </div>
+
+              <div className="form-group">
+                <label>Operations Plan</label>
+                <textarea value={formData.businessPlan?.operations_plan || ''} onChange={e => setNested('businessPlan', 'operations_plan', e.target.value)}
+                  placeholder="Staffing model, facilities, technology/systems, and how the work gets done day to day."
+                  rows={3} />
+              </div>
+
+              <div className="form-group">
+                <label>Growth & Expansion Strategy</label>
+                <textarea value={formData.businessPlan?.growth_strategy || ''} onChange={e => setNested('businessPlan', 'growth_strategy', e.target.value)}
+                  placeholder="Where the organization is headed: expansion milestones, new sites or programs, scaling plan and timeline."
+                  rows={3} />
+              </div>
+
+              <div className="form-group">
+                <label>Financial Projections</label>
+                <textarea value={formData.businessPlan?.financial_projections || ''} onChange={e => setNested('businessPlan', 'financial_projections', e.target.value)}
+                  placeholder="Revenue and expense outlook for the next 2-3 years, and the key assumptions behind the numbers."
+                  rows={3} />
+              </div>
+
+              <div className="form-group">
+                <label>Funding Strategy</label>
+                <textarea value={formData.businessPlan?.funding_strategy || ''} onChange={e => setNested('businessPlan', 'funding_strategy', e.target.value)}
+                  placeholder="How the plan gets funded: grants, contracts, earned revenue, individual giving — and the mix you're moving toward."
+                  rows={3} />
+              </div>
+
+              <div className="form-group">
+                <label>Key Risks & Mitigation</label>
+                <textarea value={formData.businessPlan?.risks_and_mitigation || ''} onChange={e => setNested('businessPlan', 'risks_and_mitigation', e.target.value)}
+                  placeholder="What could derail the plan (funding concentration, staffing, demand shifts) and what you're doing about each."
+                  rows={3} />
+              </div>
             </section>
           )}
 

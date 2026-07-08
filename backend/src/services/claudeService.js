@@ -1,5 +1,5 @@
 const Anthropic = require('@anthropic-ai/sdk');
-const { getMockRFPAnalysis, getMockDraft, getMockImprovedDraft } = require('./mockApiService');
+const { getMockRFPAnalysis, getMockDraft, getMockImprovedDraft, getMockBusinessPlanAnalysis } = require('./mockApiService');
 
 const CLAUDE_API_KEY = process.env.CLAUDE_API_KEY;
 const USE_MOCK_API = process.env.USE_MOCK_API === 'true' || !CLAUDE_API_KEY;
@@ -59,6 +59,46 @@ Return exactly this JSON structure:
   }
 }
 
+// ─── BUSINESS PLAN PARSING ────────────────────────────────────────────────────
+
+async function parseBusinessPlan(planText) {
+  if (USE_MOCK_API) {
+    console.log('[MOCK] Parsing business plan with mock Claude response...');
+    return getMockBusinessPlanAnalysis(planText);
+  }
+
+  const message = await anthropic.messages.create({
+    model: MODEL,
+    max_tokens: 3000,
+    messages: [{
+      role: 'user',
+      content: `You are an expert business analyst. Extract the key sections from this business plan so they can pre-fill an organization's profile. Summarize each section faithfully in the organization's own voice — do not invent facts that are not in the document. If a section is not covered, use an empty string. Return ONLY valid JSON.
+
+BUSINESS PLAN TEXT:
+${planText}
+
+Return exactly this JSON structure:
+{
+  "executive_summary": "2-4 sentence summary of the plan's executive summary",
+  "products_and_programs": "what the organization offers and how it is delivered",
+  "market_analysis": "the community need, market landscape, and competitive positioning",
+  "marketing_outreach": "how the organization reaches its audience/clients/customers",
+  "operations_plan": "staffing, facilities, systems, and day-to-day operating model",
+  "growth_strategy": "expansion plans, milestones, and scaling approach",
+  "financial_projections": "revenue/expense projections and key financial assumptions",
+  "funding_strategy": "how the organization funds the plan (grants, revenue, investment, donations)",
+  "risks_and_mitigation": "key risks identified and how they are mitigated"
+}`
+    }]
+  });
+
+  try {
+    return JSON.parse(message.content[0].text);
+  } catch {
+    return { error: 'Failed to parse business plan', executive_summary: '', products_and_programs: '', market_analysis: '', marketing_outreach: '', operations_plan: '', growth_strategy: '', financial_projections: '', funding_strategy: '', risks_and_mitigation: '' };
+  }
+}
+
 // ─── ORG PROFILE CONTEXT BUILDER ──────────────────────────────────────────────
 
 function buildOrgContext(org) {
@@ -78,6 +118,23 @@ function buildOrgContext(org) {
   const outcomesStr = outcomes.recent_results
     ? (Array.isArray(outcomes.recent_results) ? outcomes.recent_results.join('; ') : outcomes.recent_results)
     : (org.trackRecord || org.track_record || 'Not provided');
+
+  const plan = org.businessPlan || org.business_plan || {};
+  const planSections = [
+    ['Executive Summary', plan.executive_summary],
+    ['Products & Programs', plan.products_and_programs],
+    ['Market / Community Analysis', plan.market_analysis],
+    ['Marketing & Outreach', plan.marketing_outreach],
+    ['Operations Plan', plan.operations_plan],
+    ['Growth Strategy', plan.growth_strategy],
+    ['Financial Projections', plan.financial_projections],
+    ['Funding Strategy', plan.funding_strategy],
+    ['Risks & Mitigation', plan.risks_and_mitigation]
+  ].filter(([, v]) => typeof v === 'string' && v.trim());
+
+  const businessPlanBlock = planSections.length > 0
+    ? `\n\nBUSINESS PLAN:\n${planSections.map(([label, v]) => `${label}: ${v}`).join('\n')}`
+    : '';
 
   return `ORGANIZATION: ${org.name}
 EIN: ${org.ein || 'Not provided'} | Tax Status: ${org.taxExemptStatus || org.tax_exempt_status || '501(c)(3)'}
@@ -111,7 +168,7 @@ SUSTAINABILITY PLAN: ${org.sustainabilityPlan || org.sustainability_plan || 'Not
 DEI COMMITMENT: ${org.diversityEquityInclusion || org.diversity_equity_inclusion || 'Not provided'}
 
 PREVIOUS FUNDERS:
-${previousGrantors}`;
+${previousGrantors}${businessPlanBlock}`;
 }
 
 // ─── FULL EXPERT DRAFT GENERATION ─────────────────────────────────────────────
@@ -262,4 +319,4 @@ ${(recommendations || []).map(r => `• ${r.message || r}`).join('\n') || 'None'
   }
 }
 
-module.exports = { parseRFP, generateDraft, generateImprovedDraft };
+module.exports = { parseRFP, parseBusinessPlan, generateDraft, generateImprovedDraft };

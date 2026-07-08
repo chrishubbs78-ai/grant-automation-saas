@@ -93,6 +93,17 @@ async function startServer() {
     await sequelize.sync({ alter: false });
     console.log('Models synced');
 
+    // sync({ alter: false }) never adds columns to pre-existing tables, so
+    // additive changes need an explicit idempotent migration here.
+    await sequelize.query(`
+      ALTER TABLE organizations
+        ADD COLUMN IF NOT EXISTS "businessPlan" JSONB DEFAULT '{}',
+        ADD COLUMN IF NOT EXISTS "businessPlanText" TEXT,
+        ADD COLUMN IF NOT EXISTS "businessPlanFileName" VARCHAR(255),
+        ADD COLUMN IF NOT EXISTS "businessPlanUploadedAt" TIMESTAMP WITH TIME ZONE
+    `);
+    console.log('Additive migrations applied');
+
     // Seed default user (persistent auth)
     const { ensureDefaultUser } = require('./routes/auth');
     await ensureDefaultUser();

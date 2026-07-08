@@ -265,6 +265,26 @@ function getMockDraft({ orgProfile, rfpAnalysis }) {
   };
 }
 
+// Mock business plan parsing — pulls a few real phrases from the text so the
+// pre-filled questionnaire looks plausible in dev/demo mode
+function getMockBusinessPlanAnalysis(planText) {
+  const text = String(planText || '');
+  const firstSentences = text.replace(/\s+/g, ' ').trim().split(/(?<=[.!?])\s+/).slice(0, 3).join(' ');
+  const excerpt = firstSentences.substring(0, 400) || 'The organization delivers community-based programming with a clear plan for sustainable growth.';
+
+  return {
+    executive_summary: excerpt,
+    products_and_programs: 'Core programs and services as described in the business plan, delivered through direct service and community partnerships.',
+    market_analysis: 'The plan documents strong demand in the target service area, with existing providers reaching only a fraction of eligible participants.',
+    marketing_outreach: 'Outreach via community partners, referral networks, digital channels, and word of mouth from program alumni.',
+    operations_plan: 'Lean staffing model with experienced program leadership, established facilities, and documented operating procedures.',
+    growth_strategy: 'Phased expansion: deepen current-site capacity first, then replicate to adjacent service areas as funding allows.',
+    financial_projections: 'Multi-year projections show diversified revenue growth with expenses scaling in line with program expansion.',
+    funding_strategy: 'Blend of foundation grants, government contracts, individual giving, and a growing earned-revenue component.',
+    risks_and_mitigation: 'Key risks include funding concentration and staffing capacity, mitigated by revenue diversification and staff development investment.'
+  };
+}
+
 // Mock improved draft for reapplications
 function getMockImprovedDraft({ orgProfile, rfpAnalysis, previousDraft, rejectionFeedback }) {
   const base = getMockDraft({ orgProfile: orgProfile || {}, rfpAnalysis: rfpAnalysis || {} });
@@ -287,5 +307,6 @@ module.exports = {
   getMockRFPAnalysis,
   getMockFunderResearch,
   getMockDraft,
-  getMockImprovedDraft
+  getMockImprovedDraft,
+  getMockBusinessPlanAnalysis
 };

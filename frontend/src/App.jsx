@@ -112,6 +112,7 @@ function App() {
       {view === 'dashboard' && token && orgProfile && (
         <Dashboard
           orgProfile={orgProfile}
+          onEditProfile={() => setView('questionnaire')}
         />
       )}
     </div>

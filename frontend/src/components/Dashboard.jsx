@@ -9,7 +9,7 @@ import ReapplyQueue from './ReapplyQueue';
 import { connectSocket, disconnectSocket } from '../services/socket';
 import '../styles/dashboard.css';
 
-export default function Dashboard({ orgProfile }) {
+export default function Dashboard({ orgProfile, onEditProfile }) {
   const [grants, setGrants] = useState([]);
   const [stats, setStats] = useState({
     submitted: 0,
@@ -441,6 +441,11 @@ export default function Dashboard({ orgProfile }) {
           <h1>Grant Dashboard</h1>
           <p>{orgProfile.name || 'Grant Organization'}</p>
         </div>
+        {onEditProfile && (
+          <button className="btn-edit-profile" onClick={onEditProfile} title="Update your questionnaire and business plan">
+            ✏️ Edit Profile & Business Plan
+          </button>
+        )}
       </header>
 
       <div className="dashboard-main">

@@ -23,7 +23,7 @@ describe('Auth Routes Integration Tests (persistent users)', () => {
     test('Should create a user in the database and return a valid JWT', async () => {
       const response = await request(app)
         .post('/api/auth/signup')
-        .send({ email: 'newuser@test.com', password: 'secret123' });
+        .send({ email: 'newuser@test.com', password: 'secret123!!' });
 
       expect(response.status).toBe(201);
       expect(response.body.success).toBe(true);
@@ -52,11 +52,11 @@ describe('Auth Routes Integration Tests (persistent users)', () => {
     test('Should reject duplicate email with 409', async () => {
       await request(app)
         .post('/api/auth/signup')
-        .send({ email: 'dupe@test.com', password: 'pw1' });
+        .send({ email: 'dupe@test.com', password: 'password-one' });
 
       const response = await request(app)
         .post('/api/auth/signup')
-        .send({ email: 'dupe@test.com', password: 'pw2' });
+        .send({ email: 'dupe@test.com', password: 'password-two' });
 
       expect(response.status).toBe(409);
       expect(response.body.error).toContain('already exists');

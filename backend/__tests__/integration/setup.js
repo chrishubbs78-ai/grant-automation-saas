@@ -195,18 +195,10 @@ async function performDatabaseSetup() {
     // Wait a moment for database creation to propagate
     await new Promise(resolve => setTimeout(resolve, 500));
 
-    // Close any existing connections to force reconnect
-    try {
-      await sequelize.close();
-      console.log('Closed existing database connections');
-    } catch (e) {
-      console.log('No existing connections to close');
-    }
+    // pg_terminate_backend already killed stale connections server-side;
+    // the pool will create fresh connections on the next query.
 
-    // Wait for connections to fully close
-    await new Promise(resolve => setTimeout(resolve, 200));
-
-    // Authenticate to the fresh database (creates new connection pool)
+    // Authenticate to the fresh database (creates new connections)
     console.log('Authenticating to fresh database...');
     await sequelize.authenticate();
     console.log('Connected to grant_automation database');

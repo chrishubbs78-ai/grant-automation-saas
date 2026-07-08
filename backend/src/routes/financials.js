@@ -2,11 +2,27 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const { verifyToken } = require('../middleware/auth');
 const { Organization, FinancialDocument } = require('../models');
+const { safeError } = require('../utils/safeError');
 const logger = require('../utils/logger');
 const router = express.Router();
 
 const ALLOWED_TYPES = ['990', 'audit', 'budget', 'balance_sheet', 'irs_letter', 'board_list', 'other'];
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+
+// MED-2: MIME type allowlist — only accept known document formats
+const ALLOWED_MIME_TYPES = [
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-excel',
+  'text/plain',
+  'text/csv',
+  'application/octet-stream'
+];
+
+// HIGH-6: large body limit for this route — base64 files can exceed the 10 KB app default
+const largeJsonParser = express.json({ limit: '25mb' });
 
 async function getOrgOrFail(req, res) {
   const org = await Organization.findOne({ where: { userId: req.user.userId } });
@@ -31,13 +47,13 @@ router.get('/', verifyToken, async (req, res) => {
 
     res.json({ success: true, data: docs });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: safeError(error) });
   }
 });
 
 // POST upload a document (base64 body upload — no multipart needed)
 // Body: { document_type, file_name, mime_type, file_data (base64), fiscal_year, description }
-router.post('/', verifyToken, async (req, res) => {
+router.post('/', largeJsonParser, verifyToken, async (req, res) => {
   try {
     const org = await getOrgOrFail(req, res);
     if (!org) return;
@@ -57,6 +73,15 @@ router.post('/', verifyToken, async (req, res) => {
       });
     }
 
+    // MED-2: validate MIME type against allowlist
+    const normalizedMime = mime_type || 'application/octet-stream';
+    if (!ALLOWED_MIME_TYPES.includes(normalizedMime)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Unsupported file type. Allowed: PDF, DOCX, XLSX, TXT, CSV.'
+      });
+    }
+
     const fileSizeBytes = Buffer.byteLength(file_data, 'base64');
     if (fileSizeBytes > MAX_FILE_SIZE_BYTES) {
       return res.status(413).json({
@@ -70,7 +95,7 @@ router.post('/', verifyToken, async (req, res) => {
       document_type,
       file_name: uuidv4() + '_' + file_name.replace(/[^a-zA-Z0-9._-]/g, '_'),
       original_name: file_name,
-      mime_type: mime_type || 'application/octet-stream',
+      mime_type: normalizedMime,
       file_data,
       file_size_bytes: fileSizeBytes,
       fiscal_year: fiscal_year ? parseInt(fiscal_year, 10) : null,
@@ -95,11 +120,11 @@ router.post('/', verifyToken, async (req, res) => {
       }
     });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: safeError(error) });
   }
 });
 
-// GET download a specific document (returns base64 file_data)
+// GET download a specific document
 router.get('/:id/download', verifyToken, async (req, res) => {
   try {
     const org = await getOrgOrFail(req, res);
@@ -115,16 +140,24 @@ router.get('/:id/download', verifyToken, async (req, res) => {
 
     logger.info({ docId: doc.id, orgId: org.id }, 'Financial document downloaded');
 
-    // Decode and stream back as binary
+    // MED-1: sanitize filename before putting it in a header
+    const rawName = doc.original_name || doc.file_name;
+    const safeFilename = rawName.replace(/[^\w.\-]/g, '_').substring(0, 200);
+
+    // MED-2: serve using the stored (validated-at-upload) MIME type, not a client-supplied value
+    const safeMime = ALLOWED_MIME_TYPES.includes(doc.mime_type)
+      ? doc.mime_type
+      : 'application/octet-stream';
+
     const buffer = Buffer.from(doc.file_data, 'base64');
-    res.set('Content-Type', doc.mime_type || 'application/octet-stream');
-    res.set('Content-Disposition', `attachment; filename="${doc.original_name || doc.file_name}"`);
+    res.set('Content-Type', safeMime);
+    res.set('Content-Disposition', `attachment; filename="${safeFilename}"`);
     res.set('Content-Length', buffer.length);
     res.set('Cache-Control', 'no-store');
     res.set('X-Content-Type-Options', 'nosniff');
     res.send(buffer);
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: safeError(error) });
   }
 });
 
@@ -156,7 +189,7 @@ router.patch('/:id', verifyToken, async (req, res) => {
       data: { id: doc.id, description: doc.description, fiscal_year: doc.fiscal_year }
     });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: safeError(error) });
   }
 });
 
@@ -177,7 +210,7 @@ router.delete('/:id', verifyToken, async (req, res) => {
     logger.info({ docId: req.params.id, orgId: org.id }, 'Financial document deleted');
     res.json({ success: true });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: safeError(error) });
   }
 });
 

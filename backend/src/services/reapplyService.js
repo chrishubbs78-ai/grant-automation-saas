@@ -224,8 +224,10 @@ async function runScheduledReapplyCheck() {
     const becameEligible = await refreshEligibility();
     results.becameEligible = becameEligible.length;
 
+    // MED-3: cap batch size to prevent unbounded parallel Claude API calls per scheduler tick
     const autoCandidates = await ReapplyCandidate.findAll({
-      where: { status: 'eligible', auto_reapply: true }
+      where: { status: 'eligible', auto_reapply: true },
+      limit: 10
     });
 
     for (const candidate of autoCandidates) {

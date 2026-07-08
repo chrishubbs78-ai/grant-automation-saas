@@ -6,8 +6,20 @@ const { parseRFP } = require('../services/claudeService');
 const { researchFunder } = require('../services/geminiService');
 const { extractTextFromBase64, truncateForClaude } = require('../services/fileParserService');
 const { emitToUser } = require('../services/socketService');
+const { safeError } = require('../utils/safeError');
+const rateLimit = require('express-rate-limit');
 const logger = require('../utils/logger');
 const router = express.Router();
+
+// MED-3: per-user rate limit on the Claude-triggering endpoint (10 RFP uploads per hour)
+const rfpRateLimit = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  keyGenerator: (req) => req.user?.userId || req.ip,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: 'Too many RFP uploads. Please wait before trying again.'
+});
 
 // Store job status (in-memory for MVP, use Redis in production)
 const jobStatus = new Map();
@@ -16,7 +28,7 @@ const jobStatus = new Map();
 const largeJsonParser = express.json({ limit: '25mb' });
 
 // POST upload RFP — accepts { rfpText } for plain text OR { fileData, mimeType, fileName } for binary files
-router.post('/upload', largeJsonParser, verifyToken, async (req, res) => {
+router.post('/upload', largeJsonParser, verifyToken, rfpRateLimit, async (req, res) => {
   try {
     let { rfpText, fileName, fileData, mimeType } = req.body;
 
@@ -72,7 +84,7 @@ router.post('/upload', largeJsonParser, verifyToken, async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      error: error.message
+      error: safeError(error)
     });
   }
 });
@@ -88,6 +100,12 @@ router.get('/:jobId', verifyToken, async (req, res) => {
         success: false,
         error: 'Job not found'
       });
+    }
+
+    // HIGH-1: verify the job belongs to the requesting user's org
+    const org = await Organization.findOne({ where: { userId: req.user.userId } });
+    if (!org || job.orgId !== org.id) {
+      return res.status(403).json({ success: false, error: 'Unauthorized' });
     }
 
     if (job.status === 'processing') {
@@ -127,7 +145,7 @@ router.get('/:jobId', verifyToken, async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      error: error.message
+      error: safeError(error)
     });
   }
 });

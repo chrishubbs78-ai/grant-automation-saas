@@ -4,14 +4,26 @@ const { verifyToken } = require('../middleware/auth');
 const { Organization, Grant, RFPAnalysis, Draft, Analytics } = require('../models');
 const { generateDraft } = require('../services/claudeService');
 const { emitToUser } = require('../services/socketService');
+const { safeError } = require('../utils/safeError');
+const rateLimit = require('express-rate-limit');
 const logger = require('../utils/logger');
 const router = express.Router();
+
+// MED-3: per-user rate limit on draft generation (10 drafts per hour)
+const draftRateLimit = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  keyGenerator: (req) => req.user?.userId || req.ip,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: 'Too many draft requests. Please wait before trying again.'
+});
 
 // Store job status (in-memory for MVP, use Redis in production)
 const jobStatus = new Map();
 
 // POST generate draft
-router.post('/generate', verifyToken, async (req, res) => {
+router.post('/generate', verifyToken, draftRateLimit, async (req, res) => {
   try {
     const { rfpAnalysisId } = req.body;
 
@@ -34,7 +46,8 @@ router.post('/generate', verifyToken, async (req, res) => {
       });
     }
 
-    const rfp = await RFPAnalysis.findByPk(rfpAnalysisId);
+    // MED-8: scope RFP lookup to caller's org — prevents using another org's parsed RFP
+    const rfp = await RFPAnalysis.findOne({ where: { id: rfpAnalysisId, org_id: org.id } });
     if (!rfp) {
       return res.status(404).json({
         success: false,
@@ -63,7 +76,7 @@ router.post('/generate', verifyToken, async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      error: error.message
+      error: safeError(error)
     });
   }
 });
@@ -79,6 +92,12 @@ router.get('/:jobId', verifyToken, async (req, res) => {
         success: false,
         error: 'Job not found'
       });
+    }
+
+    // HIGH-1: verify the job belongs to the requesting user's org
+    const org = await Organization.findOne({ where: { userId: req.user.userId } });
+    if (!org || job.orgId !== org.id) {
+      return res.status(403).json({ success: false, error: 'Unauthorized' });
     }
 
     if (job.status === 'processing') {
@@ -117,7 +136,7 @@ router.get('/:jobId', verifyToken, async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      error: error.message
+      error: safeError(error)
     });
   }
 });

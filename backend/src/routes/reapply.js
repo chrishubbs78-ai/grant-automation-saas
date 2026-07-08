@@ -6,7 +6,10 @@ const {
   refreshEligibility,
   executeReapply
 } = require('../services/reapplyService');
+const { safeError } = require('../utils/safeError');
 const router = express.Router();
+
+const VALID_STATUSES = ['pending', 'eligible', 'reapplied', 'dismissed'];
 
 // Resolve the caller's org or send a 404
 async function getOrg(req, res) {
@@ -26,6 +29,9 @@ router.get('/candidates', verifyToken, async (req, res) => {
 
     const where = { org_id: org.id };
     if (req.query.status) {
+      if (!VALID_STATUSES.includes(req.query.status)) {
+        return res.status(400).json({ success: false, error: `Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}` });
+      }
       where.status = req.query.status;
     }
 
@@ -40,7 +46,7 @@ router.get('/candidates', verifyToken, async (req, res) => {
 
     res.json({ success: true, data: candidates });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: safeError(error) });
   }
 });
 
@@ -61,7 +67,7 @@ router.post('/scan', verifyToken, async (req, res) => {
       }
     });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: safeError(error) });
   }
 });
 
@@ -103,7 +109,7 @@ router.post('/candidates/:id/dismiss', verifyToken, async (req, res) => {
 
     res.json({ success: true, data: candidate.get({ plain: true }) });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: safeError(error) });
   }
 });
 
@@ -144,7 +150,7 @@ router.patch('/candidates/:id', verifyToken, async (req, res) => {
 
     res.json({ success: true, data: candidate.get({ plain: true }) });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: safeError(error) });
   }
 });
 

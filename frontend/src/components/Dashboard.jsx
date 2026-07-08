@@ -6,7 +6,7 @@ import BulkActionsToolbar from './BulkActionsToolbar';
 import BulkJobMonitor from './BulkJobMonitor';
 import FinancialsVault from './FinancialsVault';
 import ReapplyQueue from './ReapplyQueue';
-import { connectSocket, disconnectSocket, getUserIdFromToken } from '../services/socket';
+import { connectSocket, disconnectSocket } from '../services/socket';
 import '../styles/dashboard.css';
 
 export default function Dashboard({ orgProfile }) {
@@ -71,10 +71,7 @@ export default function Dashboard({ orgProfile }) {
 
   // Socket.IO — real-time job progress (supplements existing polling)
   useEffect(() => {
-    const userId = getUserIdFromToken();
-    if (!userId) return;
-
-    const socket = connectSocket(userId);
+    const socket = connectSocket();
 
     socket.on('rfp:progress', ({ jobId, progress }) => {
       if (jobId === activeRfpJobId.current) {

@@ -109,16 +109,43 @@ router.put('/', verifyToken, async (req, res) => {
       });
     }
 
-    await org.update(req.body);
+    // HIGH-5: explicit allowlist prevents mass assignment of userId/id/org_id
+    const {
+      name, mission, vision, yearsInOperation,
+      website, phone, address, ein, taxExemptStatus, nteeCode,
+      problemStatement, targetPopulation, geographicScope, geographicServiceArea, annualClientsServed,
+      programsAndServices, theoryOfChange, evidenceBase,
+      trackRecord, outcomesData, pastGrantsCount,
+      teamSummary, keyStaff, boardComposition,
+      annualBudget, financialStatus, revenueBreakdown, reservesMonths, auditCompleted,
+      sustainabilityPlan, diversityEquityInclusion, previousGrantors,
+      evaluationCapabilities, partnerships, constraints, questionnaire
+    } = req.body;
+
+    const updateFields = {
+      name, mission, vision, yearsInOperation,
+      website, phone, address, ein, taxExemptStatus, nteeCode,
+      problemStatement, targetPopulation, geographicScope, geographicServiceArea, annualClientsServed,
+      programsAndServices, theoryOfChange, evidenceBase,
+      trackRecord, outcomesData, pastGrantsCount,
+      teamSummary, keyStaff, boardComposition,
+      annualBudget, financialStatus, revenueBreakdown, reservesMonths, auditCompleted,
+      sustainabilityPlan, diversityEquityInclusion, previousGrantors,
+      evaluationCapabilities, partnerships, constraints, questionnaire
+    };
+    Object.keys(updateFields).forEach(k => updateFields[k] === undefined && delete updateFields[k]);
+
+    await org.update(updateFields);
 
     res.json({
       success: true,
       data: org
     });
   } catch (error) {
+    const { safeError } = require('../utils/safeError');
     res.status(500).json({
       success: false,
-      error: error.message
+      error: safeError(error)
     });
   }
 });

@@ -6,23 +6,24 @@ let socket = null;
 
 export function getSocket() {
   if (!socket) {
+    const token = localStorage.getItem('token');
     socket = io(BACKEND_URL, {
       autoConnect: false,
-      transports: ['websocket', 'polling']
+      transports: ['websocket', 'polling'],
+      // HIGH-3: send JWT in handshake so the server authenticates the connection
+      // before the socket can receive any events from user rooms
+      auth: { token }
     });
   }
   return socket;
 }
 
-export function connectSocket(userId) {
+export function connectSocket() {
   const s = getSocket();
   if (!s.connected) {
+    // Refresh the token in auth in case it was obtained after the socket was created
+    s.auth = { token: localStorage.getItem('token') };
     s.connect();
-    s.once('connect', () => {
-      if (userId) s.emit('join:user', userId);
-    });
-  } else if (userId) {
-    s.emit('join:user', userId);
   }
   return s;
 }

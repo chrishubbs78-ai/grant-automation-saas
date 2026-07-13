@@ -133,7 +133,9 @@ router.get('/:jobId', verifyToken, async (req, res) => {
           jobId,
           status: 'complete',
           rfpAnalysis: job.rfpAnalysis,
-          research: job.research
+          research: job.research,
+          rfpAnalysisId: job.rfpAnalysisId,
+          grantId: job.grantId
         }
       });
     }
@@ -191,7 +193,7 @@ async function processRFP(jobId, rfpText, orgId, userId) {
       rfp_analysis: rfpAnalysis
     });
 
-    await RFPAnalysis.create({
+    const analysisRecord = await RFPAnalysis.create({
       grant_id: grant.id,
       org_id: orgId,
       raw_text: rfpText.substring(0, 5000),
@@ -203,8 +205,10 @@ async function processRFP(jobId, rfpText, orgId, userId) {
       research_summary: research
     });
 
-    jobStatus.set(jobId, { status: 'complete', progress: 100, orgId, rfpAnalysis, research, grantId: grant.id });
-    emitToUser(userId, 'rfp:complete', { jobId, rfpAnalysis, grantId: grant.id });
+    // The DB record id is what draft generation needs (rfpAnalysisId) — the
+    // in-memory jobId is only for polling and must not be conflated with it.
+    jobStatus.set(jobId, { status: 'complete', progress: 100, orgId, rfpAnalysis, research, grantId: grant.id, rfpAnalysisId: analysisRecord.id });
+    emitToUser(userId, 'rfp:complete', { jobId, rfpAnalysis, grantId: grant.id, rfpAnalysisId: analysisRecord.id });
 
     logger.info({ jobId, grantId: grant.id }, 'RFP analysis complete');
   } catch (error) {

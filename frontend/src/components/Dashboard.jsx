@@ -1,3 +1,4 @@
+import { API_BASE } from '../config';
 import { useState, useEffect, useRef } from 'react';
 import RFPUploader from './RFPUploader';
 import SearchFilter from './SearchFilter';
@@ -31,6 +32,9 @@ export default function Dashboard({ orgProfile, onEditProfile }) {
   const [jobId, setJobId] = useState(null);
   const [jobStatus, setJobStatus] = useState(null);
   const [rfpAnalysis, setRfpAnalysis] = useState(null);
+  // DB record id of the stored analysis — this (not the polling jobId) is what
+  // draft generation takes as rfpAnalysisId
+  const [rfpAnalysisId, setRfpAnalysisId] = useState(null);
   const [polling, setPolling] = useState(false);
   const [pollingError, setPollingError] = useState(null);
 
@@ -79,9 +83,10 @@ export default function Dashboard({ orgProfile, onEditProfile }) {
       }
     });
 
-    socket.on('rfp:complete', ({ jobId, rfpAnalysis }) => {
+    socket.on('rfp:complete', ({ jobId, rfpAnalysis, rfpAnalysisId: analysisId }) => {
       if (jobId === activeRfpJobId.current) {
         setRfpAnalysis(rfpAnalysis);
+        setRfpAnalysisId(analysisId || null);
         setJobStatus('complete');
         setPolling(false);
         setPollingError(null);
@@ -135,7 +140,7 @@ export default function Dashboard({ orgProfile, onEditProfile }) {
     const interval = setInterval(async () => {
       try {
         const token = localStorage.getItem('token');
-        const res = await fetch(`http://localhost:4006/api/rfp/${jobId}`, {
+        const res = await fetch(`${API_BASE}/api/rfp/${jobId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         const json = await res.json();
@@ -145,6 +150,7 @@ export default function Dashboard({ orgProfile, onEditProfile }) {
 
           if (json.data.status === 'complete') {
             setRfpAnalysis(json.data.rfpAnalysis);
+            setRfpAnalysisId(json.data.rfpAnalysisId || null);
             setPolling(false);
             setPollingError(null);
           } else if (json.data.status === 'error') {
@@ -169,7 +175,7 @@ export default function Dashboard({ orgProfile, onEditProfile }) {
     const interval = setInterval(async () => {
       try {
         const token = localStorage.getItem('token');
-        const res = await fetch(`http://localhost:4006/api/drafts/${draftJobId}`, {
+        const res = await fetch(`${API_BASE}/api/drafts/${draftJobId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         const json = await res.json();
@@ -212,7 +218,7 @@ export default function Dashboard({ orgProfile, onEditProfile }) {
       if (filters.amount_max) params.set('amount_max', filters.amount_max);
       if (filters.sort) params.set('sort', filters.sort);
 
-      const response = await fetch(`http://localhost:4006/api/grants?${params}`, {
+      const response = await fetch(`${API_BASE}/api/grants?${params}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const result = await response.json();
@@ -236,7 +242,7 @@ export default function Dashboard({ orgProfile, onEditProfile }) {
   const fetchAnalytics = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:4006/api/analytics', {
+      const response = await fetch(`${API_BASE}/api/analytics`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const result = await response.json();
@@ -266,7 +272,7 @@ export default function Dashboard({ orgProfile, onEditProfile }) {
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(
-        `http://localhost:4006/api/outcomes/${selectedGrantForOutcome}`,
+        `${API_BASE}/api/outcomes/${selectedGrantForOutcome}`,
         {
           method: 'POST',
           headers: {
@@ -309,22 +315,23 @@ export default function Dashboard({ orgProfile, onEditProfile }) {
     setPolling(true);
     setPollingError(null);
     setRfpAnalysis(null);
+    setRfpAnalysisId(null);
     setDraft(null);
     setDraftJobId(null);
   };
 
   const handleGenerateDraft = async () => {
-    if (!jobId) return;
+    if (!rfpAnalysisId) return;
 
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:4006/api/drafts/generate', {
+      const res = await fetch(`${API_BASE}/api/drafts/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ rfpAnalysisId: jobId })
+        body: JSON.stringify({ rfpAnalysisId })
       });
 
       const json = await res.json();
@@ -379,7 +386,7 @@ export default function Dashboard({ orgProfile, onEditProfile }) {
   const handleBulkUpdateStatus = async (grantIds, newStatus) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:4006/api/bulk/update-status', {
+      const response = await fetch(`${API_BASE}/api/bulk/update-status`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -407,7 +414,7 @@ export default function Dashboard({ orgProfile, onEditProfile }) {
   const handleBulkExportCSV = async (grantIds) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:4006/api/bulk/export-csv', {
+      const response = await fetch(`${API_BASE}/api/bulk/export-csv`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -535,14 +542,14 @@ export default function Dashboard({ orgProfile, onEditProfile }) {
                         {jobStatus === 'complete' && rfpAnalysis && (
                           <a
                             className="btn-download-docx"
-                            href={`http://localhost:4006/api/export/grants/${draft?.grant_id}/docx`}
+                            href={`${API_BASE}/api/export/grants/${draft?.grant_id}/docx`}
                             target="_blank"
                             rel="noreferrer"
                             title="Download formatted Word document"
                             onClick={e => {
                               e.preventDefault();
                               const token = localStorage.getItem('token');
-                              fetch(`http://localhost:4006/api/export/grants/${draft?.grant_id}/docx`, {
+                              fetch(`${API_BASE}/api/export/grants/${draft?.grant_id}/docx`, {
                                 headers: { Authorization: `Bearer ${token}` }
                               }).then(r => r.blob()).then(blob => {
                                 const url = URL.createObjectURL(blob);

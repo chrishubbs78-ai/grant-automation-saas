@@ -1,3 +1,4 @@
+import { API_BASE } from '../config';
 import React, { useState, useEffect } from 'react';
 import { getSocket } from '../services/socket';
 import './BulkJobMonitor.css';
@@ -28,7 +29,7 @@ const BulkJobMonitor = ({ jobId, onComplete, onClose }) => {
     const pollJob = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`http://localhost:4006/api/bulk/${jobId}`, {
+        const response = await fetch(`${API_BASE}/api/bulk/${jobId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
 
@@ -118,7 +119,7 @@ const BulkJobMonitor = ({ jobId, onComplete, onClose }) => {
                 onClick={async () => {
                   try {
                     const token = localStorage.getItem('token');
-                    const res = await fetch(`http://localhost:4006/api/bulk/${job.id}/download`, {
+                    const res = await fetch(`${API_BASE}/api/bulk/${job.id}/download`, {
                       headers: { Authorization: `Bearer ${token}` }
                     });
                     if (!res.ok) throw new Error('Download failed');

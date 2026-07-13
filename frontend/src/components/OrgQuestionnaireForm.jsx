@@ -1,7 +1,8 @@
+import { API_BASE } from '../config';
 import { useState, useRef } from 'react';
 import '../styles/questionnaire.css';
 
-const API = 'http://localhost:4006';
+const API = `${API_BASE}`;
 
 const BLANK_BUSINESS_PLAN = {
   executive_summary: '',

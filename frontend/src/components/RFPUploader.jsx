@@ -1,3 +1,4 @@
+import { API_BASE } from '../config';
 import { useState, useRef } from 'react';
 import '../styles/rfp-uploader.css';
 
@@ -60,7 +61,7 @@ export default function RFPUploader({ onUploadStart, onUploadComplete }) {
       onUploadStart?.();
 
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:4006/api/rfp/upload', {
+      const res = await fetch(`${API_BASE}/api/rfp/upload`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(body)
@@ -98,7 +99,7 @@ export default function RFPUploader({ onUploadStart, onUploadComplete }) {
 
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:4006/api/rfp/upload', {
+      const res = await fetch(`${API_BASE}/api/rfp/upload`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ rfpText: pastedText, fileName: 'pasted-rfp.txt' })

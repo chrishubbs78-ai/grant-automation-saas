@@ -1,6 +1,7 @@
+import { API_BASE } from '../config';
 import { io } from 'socket.io-client';
 
-const BACKEND_URL = 'http://localhost:4006';
+const BACKEND_URL = `${API_BASE}`;
 
 let socket = null;
 

@@ -1,7 +1,8 @@
+import { API_BASE } from '../config';
 import { useState, useEffect } from 'react';
 import '../styles/reapply-queue.css';
 
-const API = 'http://localhost:4006';
+const API = `${API_BASE}`;
 const STATUS_LABELS = { pending: 'Pending', eligible: 'Eligible', reapplied: 'Reapplied', dismissed: 'Dismissed' };
 const STATUS_CLASS = { pending: 'status-pending', eligible: 'status-eligible', reapplied: 'status-reapplied', dismissed: 'status-dismissed' };
 

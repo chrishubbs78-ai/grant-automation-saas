@@ -1,7 +1,8 @@
+import { API_BASE } from '../config';
 import { useState, useEffect, useRef } from 'react';
 import '../styles/financials.css';
 
-const API = 'http://localhost:4006';
+const API = `${API_BASE}`;
 
 const DOC_TYPES = [
   { value: '990', label: 'IRS Form 990' },

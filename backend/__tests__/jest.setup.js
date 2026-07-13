@@ -8,7 +8,8 @@ jest.mock('dotenv', () => ({
 
 // Set test environment variables
 process.env.NODE_ENV = 'test';
-process.env.DATABASE_URL = 'postgresql://postgres@localhost:5432/grant_automation';
+// Respect an externally provided DATABASE_URL (e.g. when local postgres needs a password)
+process.env.DATABASE_URL = process.env.DATABASE_URL || 'postgresql://postgres@localhost:5432/grant_automation';
 process.env.JWT_SECRET = 'test-secret-key';
 process.env.ANTHROPIC_API_KEY = 'test-api-key';
 process.env.GEMINI_API_KEY = 'test-gemini-key';

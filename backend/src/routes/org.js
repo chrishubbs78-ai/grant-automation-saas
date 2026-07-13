@@ -26,6 +26,15 @@ const BUSINESS_PLAN_SECTIONS = [
   'financial_projections', 'funding_strategy', 'risks_and_mitigation'
 ];
 
+// The questionnaire form submits '' for untouched numeric inputs, which
+// Postgres rejects for INTEGER/DECIMAL columns — normalize to null.
+const NUMERIC_FIELDS = ['yearsInOperation', 'pastGrantsCount', 'annualClientsServed', 'annualBudget', 'reservesMonths'];
+function normalizeNumerics(fields) {
+  for (const key of NUMERIC_FIELDS) {
+    if (fields[key] === '') fields[key] = null;
+  }
+}
+
 // GET org profile
 router.get('/', verifyToken, async (req, res) => {
   try {
@@ -102,6 +111,7 @@ router.post('/questionnaire', verifyToken, async (req, res) => {
     };
     // Strip undefined so partial saves don't overwrite existing values with null
     Object.keys(updateFields).forEach(k => updateFields[k] === undefined && delete updateFields[k]);
+    normalizeNumerics(updateFields);
 
     if (org) {
       await org.update(updateFields);
@@ -163,6 +173,7 @@ router.put('/', verifyToken, async (req, res) => {
       evaluationCapabilities, partnerships, constraints, questionnaire
     };
     Object.keys(updateFields).forEach(k => updateFields[k] === undefined && delete updateFields[k]);
+    normalizeNumerics(updateFields);
 
     await org.update(updateFields);
 

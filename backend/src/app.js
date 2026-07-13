@@ -1,17 +1,21 @@
 require('dotenv').config();
+const http = require('http');
 const express = require('express');
+const { Server } = require('socket.io');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
 const { sequelize } = require('./models');
 const { logKeyStatus } = require('./utils/apiKeyChecker');
+const { initIO } = require('./services/socketService');
 
 const app = express();
+const httpServer = http.createServer(app);
 
 // Security middleware
 app.use(helmet());
 
-// CORS configuration - restrict to allowed origins
+// CORS configuration
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173').split(',');
 app.use(cors({
   origin: (origin, callback) => {
@@ -25,7 +29,7 @@ app.use(cors({
   optionsSuccessStatus: 200
 }));
 
-// Rate limiting - 100 requests per 15 minutes per IP
+// Rate limiting — 100 requests per 15 minutes per IP
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
@@ -33,7 +37,8 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// Middleware
+// Default body parser — small limit for all standard JSON routes.
+// File-upload routes (/api/rfp/upload, /api/financials) apply their own larger limit.
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
@@ -45,15 +50,19 @@ app.use('/api/templates', require('./routes/templates'));
 app.use('/api/bulk', require('./routes/bulk'));
 app.use('/api/rfp', require('./routes/rfp'));
 app.use('/api/draft', require('./routes/drafts'));
+app.use('/api/drafts', require('./routes/drafts'));
 app.use('/api/outcomes', require('./routes/outcomes'));
 app.use('/api/analytics', require('./routes/analytics'));
+app.use('/api/reapply', require('./routes/reapply'));
+app.use('/api/financials', require('./routes/financials'));
+app.use('/api/export', require('./routes/export'));
 
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-// Error handling - log detailed errors, send generic response in production
+// Error handling
 app.use((err, req, res, next) => {
   const logger = require('pino')();
   logger.error({
@@ -64,7 +73,6 @@ app.use((err, req, res, next) => {
     statusCode: err.status || 500
   });
 
-  // Don't expose error details in production
   const isProduction = process.env.NODE_ENV === 'production';
   const errorMessage = isProduction ? 'Internal server error' : err.message;
 
@@ -85,10 +93,42 @@ async function startServer() {
     await sequelize.sync({ alter: false });
     console.log('Models synced');
 
+    // sync({ alter: false }) never adds columns to pre-existing tables, so
+    // additive changes need an explicit idempotent migration here.
+    await sequelize.query(`
+      ALTER TABLE organizations
+        ADD COLUMN IF NOT EXISTS "businessPlan" JSONB DEFAULT '{}',
+        ADD COLUMN IF NOT EXISTS "businessPlanText" TEXT,
+        ADD COLUMN IF NOT EXISTS "businessPlanFileName" VARCHAR(255),
+        ADD COLUMN IF NOT EXISTS "businessPlanUploadedAt" TIMESTAMP WITH TIME ZONE
+    `);
+    console.log('Additive migrations applied');
+
+    // Seed default user (persistent auth)
+    const { ensureDefaultUser } = require('./routes/auth');
+    await ensureDefaultUser();
+
     // Check for required API keys
     logKeyStatus();
 
-    app.listen(PORT, () => {
+    // Start background auto-reapply checks
+    const { startReapplyScheduler } = require('./services/reapplyScheduler');
+    startReapplyScheduler();
+
+    // Initialize Socket.IO on the HTTP server
+    const io = new Server(httpServer, {
+      cors: {
+        origin: allowedOrigins,
+        credentials: true
+      }
+    });
+    initIO(io);
+    console.log('Socket.IO initialized');
+
+    // Initialize Bull worker processors (registers queue handlers)
+    require('./workers/bulkWorker');
+
+    httpServer.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
       console.log(`Health check: http://localhost:${PORT}/health`);
     });

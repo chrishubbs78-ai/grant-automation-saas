@@ -230,6 +230,21 @@ NODE_ENV=production
 PORT=3000  # Render uses dynamic ports
 ```
 
+**Optional variables:**
+```
+# Redis — enables async Bull queue for bulk operations.
+# Without it, bulk jobs run synchronously (fine for single-org use).
+REDIS_URL=redis://host:6379
+
+# Default owner account (seeded into the users table on first startup)
+DEFAULT_USER_EMAIL=owner@yourdomain.com
+DEFAULT_USER_PASSWORD=<strong-password>  # CHANGE FROM DEFAULT IN PRODUCTION
+
+# Auto-reapply scheduler
+REAPPLY_LEAD_DAYS=60
+REAPPLY_CHECK_INTERVAL_HOURS=24
+```
+
 **Generate secure JWT secret:**
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"

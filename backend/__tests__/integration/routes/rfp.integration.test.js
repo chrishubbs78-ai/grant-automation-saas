@@ -22,8 +22,18 @@ describe('RFP Routes Integration Tests', () => {
   });
 
   beforeEach(async () => {
-    await RFPAnalysis.truncate({ cascade: true });
-    await Organization.truncate({ cascade: true });
+    // The async RFP-processing job from a previous test can still be writing
+    // when this cleanup runs, briefly locking the tables — retry once.
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await RFPAnalysis.truncate({ cascade: true });
+        await Organization.truncate({ cascade: true });
+        break;
+      } catch (err) {
+        if (attempt >= 2) throw err;
+        await new Promise(r => setTimeout(r, 300));
+      }
+    }
 
     await Organization.create({
       id: testOrgId,

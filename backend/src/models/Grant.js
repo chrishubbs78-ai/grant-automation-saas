@@ -44,6 +44,16 @@ module.exports = (sequelize) => {
     notes: {
       type: DataTypes.TEXT
     },
+    parent_grant_id: {
+      type: DataTypes.UUID,
+      references: { model: 'grants', key: 'id' },
+      comment: 'Original grant this is a reapplication of'
+    },
+    reapply_count: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+      comment: 'How many times this opportunity has been reapplied to'
+    },
     created_at: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW
@@ -68,6 +78,9 @@ module.exports = (sequelize) => {
     Grant.hasOne(models.RFPAnalysis, { foreignKey: 'grant_id', as: 'rfpAnalysis' });
     Grant.hasMany(models.Draft, { foreignKey: 'grant_id', as: 'draftVersions' });
     Grant.hasOne(models.Outcome, { foreignKey: 'grant_id', as: 'outcome' });
+    Grant.belongsTo(models.Grant, { foreignKey: 'parent_grant_id', as: 'parentGrant' });
+    Grant.hasMany(models.Grant, { foreignKey: 'parent_grant_id', as: 'reapplications' });
+    Grant.hasOne(models.ReapplyCandidate, { foreignKey: 'grant_id', as: 'reapplyCandidate' });
   };
 
   return Grant;

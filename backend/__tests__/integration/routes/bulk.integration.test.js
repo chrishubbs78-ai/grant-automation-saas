@@ -308,6 +308,80 @@ describe('Bulk Operations Routes Integration Tests', () => {
     });
   });
 
+  describe('GET /api/bulk/:jobId/download', () => {
+    test('Should download CSV result for a completed export job', async () => {
+      const token = generateToken(testUserId);
+
+      await Grant.create({
+        org_id: testOrgId,
+        funder_name: 'CSV Funder',
+        status: 'draft',
+        amount: 75000
+      });
+
+      const exportResponse = await request(app)
+        .post('/api/bulk/export-csv')
+        .set('Authorization', `Bearer ${token}`)
+        .send({});
+
+      const jobId = exportResponse.body.data.id;
+
+      const response = await request(app)
+        .get(`/api/bulk/${jobId}/download`)
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(response.status).toBe(200);
+      expect(response.headers['content-type']).toContain('text/csv');
+      expect(response.headers['content-disposition']).toContain('attachment');
+      expect(response.text).toContain('CSV Funder');
+    });
+
+    test('Should return 404 for jobs without downloadable result', async () => {
+      const token = generateToken(testUserId);
+
+      const grant = await Grant.create({
+        org_id: testOrgId,
+        funder_name: 'Test',
+        status: 'draft'
+      });
+
+      const updateResponse = await request(app)
+        .post('/api/bulk/update-status')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ grant_ids: [grant.id], new_status: 'submitted' });
+
+      const response = await request(app)
+        .get(`/api/bulk/${updateResponse.body.data.id}/download`)
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(response.status).toBe(404);
+      expect(response.body.error).toContain('No downloadable result');
+    });
+
+    test('Should not allow downloading other org\'s exports', async () => {
+      const token = generateToken(testUserId);
+
+      await Organization.create({
+        id: otherOrgId,
+        userId: otherUserId,
+        name: 'Other Organization'
+      });
+
+      const otherJob = await BulkJob.create({
+        org_id: otherOrgId,
+        operation_type: 'bulk_export_csv',
+        status: 'complete',
+        metadata: { csv: 'id,funder_name\n1,Secret' }
+      });
+
+      const response = await request(app)
+        .get(`/api/bulk/${otherJob.id}/download`)
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(response.status).toBe(403);
+    });
+  });
+
   describe('GET /api/bulk/:jobId', () => {
     test('Should poll bulk job status', async () => {
       const token = generateToken(testUserId);

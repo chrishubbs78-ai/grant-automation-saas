@@ -1,3 +1,4 @@
+import { API_BASE } from './config';
 import { useState, useEffect } from 'react';
 import './App.css';
 import OrgQuestionnaireForm from './components/OrgQuestionnaireForm';
@@ -18,7 +19,7 @@ function App() {
 
         // If no stored token, fetch default token for private/personal use
         if (!currentToken) {
-          const response = await fetch('http://localhost:4006/api/auth/default-token');
+          const response = await fetch(`${API_BASE}/api/auth/default-token`);
           const result = await response.json();
 
           if (result.success) {
@@ -32,7 +33,7 @@ function App() {
         }
 
         // Now fetch org profile
-        const orgResponse = await fetch('http://localhost:4006/api/org', {
+        const orgResponse = await fetch(`${API_BASE}/api/org`, {
           headers: { Authorization: `Bearer ${currentToken}` }
         });
         const orgResult = await orgResponse.json();
@@ -55,7 +56,7 @@ function App() {
 
   const handleQuestionnaireSubmit = async (formData) => {
     try {
-      const response = await fetch('http://localhost:4006/api/org/questionnaire', {
+      const response = await fetch(`${API_BASE}/api/org/questionnaire`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -112,6 +113,7 @@ function App() {
       {view === 'dashboard' && token && orgProfile && (
         <Dashboard
           orgProfile={orgProfile}
+          onEditProfile={() => setView('questionnaire')}
         />
       )}
     </div>

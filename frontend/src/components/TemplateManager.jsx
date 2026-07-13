@@ -1,3 +1,4 @@
+import { API_BASE } from '../config';
 import React, { useState, useEffect } from 'react';
 import './TemplateManager.css';
 
@@ -34,7 +35,7 @@ const TemplateManager = ({ onApplyTemplate, onClose }) => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:4006/api/templates', {
+      const response = await fetch(`${API_BASE}/api/templates`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -62,8 +63,8 @@ const TemplateManager = ({ onApplyTemplate, onClose }) => {
       const token = localStorage.getItem('token');
       const method = editingId ? 'PUT' : 'POST';
       const url = editingId
-        ? `http://localhost:4006/api/templates/${editingId}`
-        : 'http://localhost:4006/api/templates';
+        ? `${API_BASE}/api/templates/${editingId}`
+        : `${API_BASE}/api/templates`;
 
       const response = await fetch(url, {
         method,
@@ -99,7 +100,7 @@ const TemplateManager = ({ onApplyTemplate, onClose }) => {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:4006/api/templates/${id}`, {
+      const response = await fetch(`${API_BASE}/api/templates/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -118,7 +119,7 @@ const TemplateManager = ({ onApplyTemplate, onClose }) => {
   const handleDuplicateTemplate = async (id) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:4006/api/templates/${id}/duplicate`, {
+      const response = await fetch(`${API_BASE}/api/templates/${id}/duplicate`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       });

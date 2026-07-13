@@ -1,12 +1,16 @@
-import { useState, useEffect } from 'react';
+import { API_BASE } from '../config';
+import { useState, useEffect, useRef } from 'react';
 import RFPUploader from './RFPUploader';
 import SearchFilter from './SearchFilter';
 import TemplateManager from './TemplateManager';
 import BulkActionsToolbar from './BulkActionsToolbar';
 import BulkJobMonitor from './BulkJobMonitor';
+import FinancialsVault from './FinancialsVault';
+import ReapplyQueue from './ReapplyQueue';
+import { connectSocket, disconnectSocket } from '../services/socket';
 import '../styles/dashboard.css';
 
-export default function Dashboard({ orgProfile }) {
+export default function Dashboard({ orgProfile, onEditProfile }) {
   const [grants, setGrants] = useState([]);
   const [stats, setStats] = useState({
     submitted: 0,
@@ -28,6 +32,9 @@ export default function Dashboard({ orgProfile }) {
   const [jobId, setJobId] = useState(null);
   const [jobStatus, setJobStatus] = useState(null);
   const [rfpAnalysis, setRfpAnalysis] = useState(null);
+  // DB record id of the stored analysis — this (not the polling jobId) is what
+  // draft generation takes as rfpAnalysisId
+  const [rfpAnalysisId, setRfpAnalysisId] = useState(null);
   const [polling, setPolling] = useState(false);
   const [pollingError, setPollingError] = useState(null);
 
@@ -51,6 +58,11 @@ export default function Dashboard({ orgProfile }) {
 
   // Template manager state
   const [showTemplateManager, setShowTemplateManager] = useState(false);
+  const [showFinancialsVault, setShowFinancialsVault] = useState(false);
+
+  // Track active job IDs so socket events only apply to the current job
+  const activeRfpJobId = useRef(null);
+  const activeDraftJobId = useRef(null);
 
   // Bulk operations state
   const [selectedGrants, setSelectedGrants] = useState(new Set());
@@ -61,6 +73,66 @@ export default function Dashboard({ orgProfile }) {
     fetchAnalytics();
   }, []);
 
+  // Socket.IO — real-time job progress (supplements existing polling)
+  useEffect(() => {
+    const socket = connectSocket();
+
+    socket.on('rfp:progress', ({ jobId, progress }) => {
+      if (jobId === activeRfpJobId.current) {
+        setJobStatus('processing');
+      }
+    });
+
+    socket.on('rfp:complete', ({ jobId, rfpAnalysis, rfpAnalysisId: analysisId }) => {
+      if (jobId === activeRfpJobId.current) {
+        setRfpAnalysis(rfpAnalysis);
+        setRfpAnalysisId(analysisId || null);
+        setJobStatus('complete');
+        setPolling(false);
+        setPollingError(null);
+      }
+    });
+
+    socket.on('rfp:error', ({ jobId, error }) => {
+      if (jobId === activeRfpJobId.current) {
+        setPollingError(error);
+        setJobStatus('error');
+        setPolling(false);
+      }
+    });
+
+    socket.on('draft:progress', ({ jobId }) => {
+      if (jobId === activeDraftJobId.current) {
+        setDraftStatus('processing');
+      }
+    });
+
+    socket.on('draft:complete', ({ jobId, draft }) => {
+      if (jobId === activeDraftJobId.current) {
+        setDraft(draft);
+        setDraftStatus('complete');
+        setDraftPolling(false);
+      }
+    });
+
+    socket.on('draft:error', ({ jobId }) => {
+      if (jobId === activeDraftJobId.current) {
+        setDraftStatus('error');
+        setDraftPolling(false);
+      }
+    });
+
+    return () => {
+      socket.off('rfp:progress');
+      socket.off('rfp:complete');
+      socket.off('rfp:error');
+      socket.off('draft:progress');
+      socket.off('draft:complete');
+      socket.off('draft:error');
+      disconnectSocket();
+    };
+  }, []);
+
   // Poll RFP job status
   useEffect(() => {
     if (!jobId || !polling) return;
@@ -68,7 +140,7 @@ export default function Dashboard({ orgProfile }) {
     const interval = setInterval(async () => {
       try {
         const token = localStorage.getItem('token');
-        const res = await fetch(`http://localhost:4006/api/rfp/${jobId}`, {
+        const res = await fetch(`${API_BASE}/api/rfp/${jobId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         const json = await res.json();
@@ -78,6 +150,7 @@ export default function Dashboard({ orgProfile }) {
 
           if (json.data.status === 'complete') {
             setRfpAnalysis(json.data.rfpAnalysis);
+            setRfpAnalysisId(json.data.rfpAnalysisId || null);
             setPolling(false);
             setPollingError(null);
           } else if (json.data.status === 'error') {
@@ -102,7 +175,7 @@ export default function Dashboard({ orgProfile }) {
     const interval = setInterval(async () => {
       try {
         const token = localStorage.getItem('token');
-        const res = await fetch(`http://localhost:4006/api/drafts/${draftJobId}`, {
+        const res = await fetch(`${API_BASE}/api/drafts/${draftJobId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         const json = await res.json();
@@ -145,7 +218,7 @@ export default function Dashboard({ orgProfile }) {
       if (filters.amount_max) params.set('amount_max', filters.amount_max);
       if (filters.sort) params.set('sort', filters.sort);
 
-      const response = await fetch(`http://localhost:4006/api/grants?${params}`, {
+      const response = await fetch(`${API_BASE}/api/grants?${params}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const result = await response.json();
@@ -169,7 +242,7 @@ export default function Dashboard({ orgProfile }) {
   const fetchAnalytics = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:4006/api/analytics', {
+      const response = await fetch(`${API_BASE}/api/analytics`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const result = await response.json();
@@ -199,7 +272,7 @@ export default function Dashboard({ orgProfile }) {
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(
-        `http://localhost:4006/api/outcomes/${selectedGrantForOutcome}`,
+        `${API_BASE}/api/outcomes/${selectedGrantForOutcome}`,
         {
           method: 'POST',
           headers: {
@@ -237,31 +310,34 @@ export default function Dashboard({ orgProfile }) {
 
   const handleUploadComplete = (uploadData) => {
     setJobId(uploadData.jobId);
+    activeRfpJobId.current = uploadData.jobId;
     setJobStatus('processing');
     setPolling(true);
     setPollingError(null);
     setRfpAnalysis(null);
+    setRfpAnalysisId(null);
     setDraft(null);
     setDraftJobId(null);
   };
 
   const handleGenerateDraft = async () => {
-    if (!jobId) return;
+    if (!rfpAnalysisId) return;
 
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:4006/api/drafts/generate', {
+      const res = await fetch(`${API_BASE}/api/drafts/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ rfpAnalysisId: jobId })
+        body: JSON.stringify({ rfpAnalysisId })
       });
 
       const json = await res.json();
       if (json.success) {
         setDraftJobId(json.data.jobId);
+        activeDraftJobId.current = json.data.jobId;
         setDraftStatus('processing');
         setDraftPolling(true);
       } else {
@@ -310,7 +386,7 @@ export default function Dashboard({ orgProfile }) {
   const handleBulkUpdateStatus = async (grantIds, newStatus) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:4006/api/bulk/update-status', {
+      const response = await fetch(`${API_BASE}/api/bulk/update-status`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -338,7 +414,7 @@ export default function Dashboard({ orgProfile }) {
   const handleBulkExportCSV = async (grantIds) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:4006/api/bulk/export-csv', {
+      const response = await fetch(`${API_BASE}/api/bulk/export-csv`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -372,6 +448,11 @@ export default function Dashboard({ orgProfile }) {
           <h1>Grant Dashboard</h1>
           <p>{orgProfile.name || 'Grant Organization'}</p>
         </div>
+        {onEditProfile && (
+          <button className="btn-edit-profile" onClick={onEditProfile} title="Update your questionnaire and business plan">
+            ✏️ Edit Profile & Business Plan
+          </button>
+        )}
       </header>
 
       <div className="dashboard-main">
@@ -379,13 +460,14 @@ export default function Dashboard({ orgProfile }) {
         <section className="rfp-section">
           <div className="section-header">
             <h2>Upload RFP or Grant Opportunity</h2>
-            <button
-              className="btn-templates"
-              onClick={() => setShowTemplateManager(true)}
-              title="Browse and apply saved templates"
-            >
-              📋 Templates
-            </button>
+            <div className="header-buttons">
+              <button className="btn-templates" onClick={() => setShowFinancialsVault(true)} title="Secure financial documents">
+                🔒 Financials
+              </button>
+              <button className="btn-templates" onClick={() => setShowTemplateManager(true)} title="Browse and apply saved templates">
+                📋 Templates
+              </button>
+            </div>
           </div>
           <RFPUploader onUploadComplete={handleUploadComplete} />
         </section>
@@ -451,23 +533,103 @@ export default function Dashboard({ orgProfile }) {
                   </ul>
                 </div>
 
-                {/* Draft Generation Section */}
+                {/* Expert Draft Sections */}
                 {draft ? (
                   <div className="draft-section">
-                    <h3>✅ Draft Generated</h3>
+                    <div className="draft-header">
+                      <h3>✅ Expert Grant Proposal Draft</h3>
+                      <div className="draft-header-actions">
+                        {jobStatus === 'complete' && rfpAnalysis && (
+                          <a
+                            className="btn-download-docx"
+                            href={`${API_BASE}/api/export/grants/${draft?.grant_id}/docx`}
+                            target="_blank"
+                            rel="noreferrer"
+                            title="Download formatted Word document"
+                            onClick={e => {
+                              e.preventDefault();
+                              const token = localStorage.getItem('token');
+                              fetch(`${API_BASE}/api/export/grants/${draft?.grant_id}/docx`, {
+                                headers: { Authorization: `Bearer ${token}` }
+                              }).then(r => r.blob()).then(blob => {
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = `Proposal_${rfpAnalysis.funder_name || 'Grant'}.docx`;
+                                a.click();
+                                URL.revokeObjectURL(url);
+                              });
+                            }}
+                          >
+                            ⬇ Download .docx
+                          </a>
+                        )}
+                        <button className="btn-copy-draft" onClick={() => {
+                        const full = [
+                          draft.executive_summary && `EXECUTIVE SUMMARY\n${draft.executive_summary}`,
+                          draft.organization_background && `ORGANIZATION BACKGROUND\n${draft.organization_background}`,
+                          draft.statement_of_need && `STATEMENT OF NEED\n${draft.statement_of_need}`,
+                          (draft.goals_and_objectives || draft.impact_statement) && `GOALS & OBJECTIVES\n${draft.goals_and_objectives || draft.impact_statement}`,
+                          draft.program_design && `PROGRAM DESIGN\n${draft.program_design}`,
+                          draft.evaluation_plan && `EVALUATION PLAN\n${draft.evaluation_plan}`,
+                          draft.sustainability_plan && `SUSTAINABILITY PLAN\n${draft.sustainability_plan}`,
+                          draft.budget_narrative && `BUDGET NARRATIVE\n${draft.budget_narrative}`
+                        ].filter(Boolean).join('\n\n---\n\n');
+                        navigator.clipboard.writeText(full);
+                        alert('Full draft copied to clipboard!');
+                      }}
+                      >📋 Copy Full Draft</button>
+                      </div>
+                    </div>
                     <div className="draft-content">
-                      <div className="draft-section-item">
-                        <h4>Problem Statement</h4>
-                        <p>{draft.problem_statement}</p>
-                      </div>
-                      <div className="draft-section-item">
-                        <h4>Impact Statement</h4>
-                        <p>{draft.impact_statement}</p>
-                      </div>
-                      <div className="draft-section-item">
-                        <h4>Budget Narrative</h4>
-                        <p>{draft.budget_narrative}</p>
-                      </div>
+                      {draft.executive_summary && (
+                        <div className="draft-section-item">
+                          <h4>Executive Summary</h4>
+                          <p>{draft.executive_summary}</p>
+                        </div>
+                      )}
+                      {draft.organization_background && (
+                        <div className="draft-section-item">
+                          <h4>Organization Background</h4>
+                          <p>{draft.organization_background}</p>
+                        </div>
+                      )}
+                      {(draft.statement_of_need || draft.problem_statement) && (
+                        <div className="draft-section-item">
+                          <h4>Statement of Need</h4>
+                          <p>{draft.statement_of_need || draft.problem_statement}</p>
+                        </div>
+                      )}
+                      {(draft.goals_and_objectives || draft.impact_statement) && (
+                        <div className="draft-section-item">
+                          <h4>Goals & Objectives</h4>
+                          <p>{draft.goals_and_objectives || draft.impact_statement}</p>
+                        </div>
+                      )}
+                      {draft.program_design && (
+                        <div className="draft-section-item">
+                          <h4>Program Design & Methodology</h4>
+                          <p>{draft.program_design}</p>
+                        </div>
+                      )}
+                      {draft.evaluation_plan && (
+                        <div className="draft-section-item">
+                          <h4>Evaluation Plan</h4>
+                          <p>{draft.evaluation_plan}</p>
+                        </div>
+                      )}
+                      {draft.sustainability_plan && (
+                        <div className="draft-section-item">
+                          <h4>Sustainability Plan</h4>
+                          <p>{draft.sustainability_plan}</p>
+                        </div>
+                      )}
+                      {draft.budget_narrative && (
+                        <div className="draft-section-item">
+                          <h4>Budget Narrative</h4>
+                          <p>{draft.budget_narrative}</p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ) : (
@@ -567,6 +729,9 @@ export default function Dashboard({ orgProfile }) {
             )}
           </section>
         )}
+
+        {/* Reapply Queue */}
+        <ReapplyQueue onReapplyComplete={() => { fetchGrants(currentFilters, pagination.page); fetchAnalytics(); }} />
 
         {/* Grants List */}
         <section className="grants-section">
@@ -800,6 +965,11 @@ export default function Dashboard({ orgProfile }) {
               />
             </div>
           </div>
+        )}
+
+        {/* Financials Vault */}
+        {showFinancialsVault && (
+          <FinancialsVault onClose={() => setShowFinancialsVault(false)} />
         )}
 
         {/* Bulk Job Monitor */}

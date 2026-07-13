@@ -2,6 +2,8 @@ const express = require('express');
 const { verifyToken } = require('../middleware/auth');
 const { Organization, Outcome, Grant } = require('../models');
 const { computeAnalytics } = require('../services/learningEngine');
+const { createCandidateForGrant } = require('../services/reapplyService');
+const { safeError } = require('../utils/safeError');
 const router = express.Router();
 
 // POST record outcome (grant funded/rejected)
@@ -28,7 +30,8 @@ router.post('/:grantId', verifyToken, async (req, res) => {
       });
     }
 
-    const grant = await Grant.findByPk(grantId);
+    // Scope to caller's org — prevents cross-org IDOR (CRIT-2)
+    const grant = await Grant.findOne({ where: { id: grantId, org_id: org.id } });
     if (!grant) {
       return res.status(404).json({
         success: false,
@@ -55,18 +58,31 @@ router.post('/:grantId', verifyToken, async (req, res) => {
     // Recompute analytics for this org
     const analytics = await computeAnalytics(org.id);
 
+    // On rejection, queue this grant as a reapply candidate for the next cycle.
+    // Failure here must not block outcome recording.
+    let reapplyCandidate = null;
+    if (!funded) {
+      try {
+        const candidate = await createCandidateForGrant(grant, outcome, org.id);
+        reapplyCandidate = candidate.get({ plain: true });
+      } catch (reapplyError) {
+        console.error('Failed to create reapply candidate:', reapplyError);
+      }
+    }
+
     res.json({
       success: true,
       data: {
         outcome: outcome.get({ plain: true }),
-        analytics
+        analytics,
+        reapplyCandidate
       }
     });
   } catch (error) {
     console.error('Outcome recording error:', error);
     res.status(500).json({
       success: false,
-      error: error.message
+      error: safeError(error)
     });
   }
 });
@@ -98,7 +114,7 @@ router.get('/', verifyToken, async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      error: error.message
+      error: safeError(error)
     });
   }
 });

@@ -1,0 +1,46 @@
+name: SyncStage CI
+
+on:
+  push:
+    paths:
+      - "syncstage/**"
+      - ".github/workflows/syncstage-ci.yml"
+  pull_request:
+    paths:
+      - "syncstage/**"
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: syncstage
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: syncstage/package-lock.json
+      - run: npm ci
+      - run: npm run build --workspace=packages/shared
+      - run: npm run typecheck --workspace=apps/web
+      - run: npm run build --workspace=apps/web
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder
+
+  workers-python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Syntax-check worker modules
+        run: |
+          python -m py_compile \
+            syncstage/workers/syncstage_common.py \
+            syncstage/workers/analyze/app.py \
+            syncstage/workers/avatar_sadtalker/app.py \
+            syncstage/workers/avatar_musetalk/app.py

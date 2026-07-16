@@ -1,0 +1,20 @@
+{
+  "name": "syncstage",
+  "private": true,
+  "version": "0.1.0",
+  "description": "SyncStage — AI Music Video Studio: open-source lip-sync avatar pipeline with full timeline editing",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "workers/render"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=apps/web",
+    "build": "npm run build --workspace=packages/shared && npm run build --workspace=apps/web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=18.17.0"
+  }
+}

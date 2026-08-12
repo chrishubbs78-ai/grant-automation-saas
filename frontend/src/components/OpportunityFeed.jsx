@@ -123,6 +123,17 @@ export default function OpportunityFeed({ onConverted }) {
     return Math.ceil((new Date(date) - Date.now()) / 86400000);
   };
 
+  // Name the place the link goes, so it's clear before clicking whether this
+  // is a federal listing or a funder's own site.
+  const sourceLabel = (opp) => {
+    if (opp.source === 'grants_gov') return 'Grants.gov';
+    try {
+      return new URL(opp.source_url).hostname.replace(/^www\./, '');
+    } catch {
+      return 'source';
+    }
+  };
+
   return (
     <section className="opportunities-section">
       <div className="section-header">
@@ -191,6 +202,22 @@ export default function OpportunityFeed({ onConverted }) {
                       )}
                     </div>
                     {match.rationale && <p className="opp-rationale">{match.rationale}</p>}
+
+                    {/* Where this came from. On the card face, not buried in
+                        details — verifying a listing is the first thing anyone
+                        does before committing to an application. */}
+                    {opp.source_url && (
+                      <a
+                        className="opp-source"
+                        href={opp.source_url}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                      >
+                        {opp.raw?.url_kind === 'search'
+                          ? `Find ${opp.agency || 'this funder'} ↗`
+                          : `View on ${sourceLabel(opp)} ↗`}
+                      </a>
+                    )}
                   </div>
 
                   <div className="opp-actions">

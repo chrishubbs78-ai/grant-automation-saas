@@ -231,6 +231,20 @@ const UTAH_FUNDERS = [
 ];
 
 /**
+ * Every entry needs somewhere to go. Where a funder's grants page is confirmed
+ * we link it directly; otherwise we hand over a search rather than guessing a
+ * URL that 404s. A dead link is worse than an honest search — it costs the
+ * reader a click and their trust in the rest of the list.
+ */
+function funderLink(f) {
+  if (f.source_url) return { url: f.source_url, kind: 'official' };
+  return {
+    url: 'https://www.google.com/search?q=' + encodeURIComponent(f.agency + ' grant guidelines'),
+    kind: 'search'
+  };
+}
+
+/**
  * Return directory entries normalized to the GrantOpportunity shape.
  * Deadlines are deliberately null: these are standing funders, not dated calls.
  */
@@ -260,8 +274,8 @@ function getUtahFunders() {
     eligible_states: ['UT'],
     service_area: f.service_area,
     opportunity_status: 'directory',
-    source_url: f.source_url || null,
-    raw: { verified: f.verified }
+    source_url: funderLink(f).url,
+    raw: { verified: f.verified, url_kind: funderLink(f).kind }
   }));
 }
 

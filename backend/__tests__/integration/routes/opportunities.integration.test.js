@@ -251,6 +251,22 @@ describe('Opportunity Discovery Integration Tests', () => {
       expect(analysis.org_id).toBe(testOrgId);
     });
 
+    test('Carries the source link onto the application record', async () => {
+      const response = await request(app)
+        .post(`/api/opportunities/${matchId}/convert`)
+        .set('Authorization', `Bearer ${token}`);
+
+      const grant = await Grant.findByPk(response.body.data.grant.id);
+      const analysis = await RFPAnalysis.findByPk(response.body.data.rfp_analysis_id);
+      const opp = await GrantOpportunity.findByPk(grant.opportunity_id);
+
+      // The trail back to the listing has to survive conversion — this is the
+      // record you work against for weeks afterward.
+      expect(opp.source_url).toBeTruthy();
+      expect(grant.notes).toContain(opp.source_url);
+      expect(analysis.research_summary.source_url).toBe(opp.source_url);
+    });
+
     test('Converted match leaves the actionable feed', async () => {
       await request(app).post(`/api/opportunities/${matchId}/convert`)
         .set('Authorization', `Bearer ${token}`);

@@ -256,6 +256,30 @@ describe('Utah funder directory', () => {
       .forEach(f => expect(f.raw.verified).toBe(true));
   });
 
+  test('Every entry links somewhere — no dead ends', () => {
+    funders.forEach(f => {
+      expect(f.source_url).toBeTruthy();
+      expect(f.source_url).toMatch(/^https:\/\//);
+      expect(['official', 'search']).toContain(f.raw.url_kind);
+    });
+  });
+
+  test('Funders without a confirmed page get a search link, not a guessed URL', () => {
+    const searchLinked = funders.filter(f => f.raw.url_kind === 'search');
+    expect(searchLinked.length).toBeGreaterThan(0);
+    searchLinked.forEach(f => {
+      expect(f.source_url).toContain('google.com/search');
+      // The search must actually name the funder, or it sends you nowhere useful
+      expect(decodeURIComponent(f.source_url)).toContain(f.agency);
+    });
+  });
+
+  test('Verified state programs link to their own grants page', () => {
+    const arts = funders.find(f => f.source_id === 'ut-arts-museums-gos');
+    expect(arts.raw.url_kind).toBe('official');
+    expect(arts.source_url).toContain('artsandmuseums.utah.gov');
+  });
+
   test('Includes state agencies, county programs, and private foundations', () => {
     const scopes = new Set(funders.map(f => f.geographic_scope));
     expect(scopes.has('state')).toBe(true);

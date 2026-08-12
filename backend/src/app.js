@@ -55,6 +55,7 @@ app.use('/api/outcomes', require('./routes/outcomes'));
 app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/reapply', require('./routes/reapply'));
 app.use('/api/financials', require('./routes/financials'));
+app.use('/api/opportunities', require('./routes/opportunities'));
 app.use('/api/export', require('./routes/export'));
 
 // Health check
@@ -102,6 +103,12 @@ async function startServer() {
         ADD COLUMN IF NOT EXISTS "businessPlanFileName" VARCHAR(255),
         ADD COLUMN IF NOT EXISTS "businessPlanUploadedAt" TIMESTAMP WITH TIME ZONE
     `);
+    // grant_opportunities is created by sync() above, so the FK target exists
+    // by the time this runs on an upgrade.
+    await sequelize.query(`
+      ALTER TABLE grants
+        ADD COLUMN IF NOT EXISTS opportunity_id UUID REFERENCES grant_opportunities(id)
+    `);
     console.log('Additive migrations applied');
 
     // Seed default user (persistent auth)
@@ -114,6 +121,10 @@ async function startServer() {
     // Start background auto-reapply checks
     const { startReapplyScheduler } = require('./services/reapplyScheduler');
     startReapplyScheduler();
+
+    // Opt-in periodic opportunity discovery (off unless AUTO_DISCOVERY_ENABLED=true)
+    const { startDiscoveryScheduler } = require('./services/discoveryScheduler');
+    startDiscoveryScheduler();
 
     // Initialize Socket.IO on the HTTP server
     const io = new Server(httpServer, {

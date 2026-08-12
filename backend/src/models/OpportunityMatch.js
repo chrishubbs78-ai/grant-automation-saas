@@ -52,6 +52,12 @@ module.exports = (sequelize) => {
       defaultValue: {},
       comment: 'Stage-1 deterministic checks: which passed, which failed, and why'
     },
+    local_boost: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+      comment: 'Points added for geographic proximity. Stored separately from the '
+        + 'model score so the adjustment is always auditable, never hidden in the total.'
+    },
     status: {
       type: DataTypes.STRING(20),
       defaultValue: 'new',

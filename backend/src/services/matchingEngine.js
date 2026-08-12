@@ -14,8 +14,20 @@
 
 const { GrantOpportunity, OpportunityMatch, Organization } = require('../models');
 const { searchOpportunities, fetchOpportunityDetail } = require('./grantsGovService');
+const { getUtahFunders } = require('./utahFunderDirectory');
 const { scoreOpportunityMatches } = require('./claudeService');
 const logger = require('../utils/logger');
+
+/**
+ * Points added for geographic proximity. A statewide funder draws from every
+ * nonprofit in one state; a national program draws from all fifty. Same effort,
+ * very different odds — so local money is worth surfacing above a federal
+ * program of equal mission fit.
+ */
+const LOCALITY_BOOST = { city: 20, county: 20, state: 15, regional: 8, national: 0 };
+
+/** In-state directories to consult, keyed by the org's own state. */
+const STATE_DIRECTORIES = { UT: getUtahFunders };
 
 // Applying takes real work; anything closing sooner than this isn't actionable.
 const MIN_LEAD_DAYS = parseInt(process.env.MATCH_MIN_LEAD_DAYS || '10', 10);
@@ -98,8 +110,56 @@ function prefilter(opportunity, org) {
     checks.award_size = { passed: true, award_to_budget_multiple: null, reason: null };
   }
 
+  // Geography: a funder that only serves other states is a hard no, however
+  // well the mission lines up. Only disqualify on a stated, non-matching list.
+  const orgState = orgHomeState(org);
+  const eligibleStates = (opportunity.eligible_states || []).map(s => String(s).toUpperCase());
+  if (eligibleStates.length > 0 && orgState) {
+    const allowed = eligibleStates.includes(orgState);
+    checks.geography = {
+      passed: allowed,
+      org_state: orgState,
+      funder_states: eligibleStates,
+      reason: allowed ? null
+        : `Funds only ${eligibleStates.join(', ')} — your organization is in ${orgState}`
+    };
+  } else {
+    checks.geography = { passed: true, org_state: orgState, funder_states: eligibleStates, reason: null };
+  }
+
   const passed = Object.values(checks).every(c => c.passed);
   return { passed, checks };
+}
+
+/** The org's home state, from its address. Null when not filled in yet. */
+function orgHomeState(org) {
+  const raw = (org.address && org.address.state) || org.state || null;
+  return raw ? String(raw).trim().toUpperCase().slice(0, 2) : null;
+}
+
+/**
+ * Local-preference boost. Returns points and the reason, kept separate from the
+ * model's score so the adjustment shows up in the UI rather than silently
+ * inflating a number the user can't account for.
+ */
+function localityBoost(opportunity, org) {
+  const orgState = orgHomeState(org);
+  if (!orgState) return { points: 0, reason: null };
+
+  const states = (opportunity.eligible_states || []).map(s => String(s).toUpperCase());
+  const isLocal = states.includes(orgState);
+  if (!isLocal) return { points: 0, reason: null };
+
+  const scope = opportunity.geographic_scope || 'national';
+  const points = LOCALITY_BOOST[scope] || 0;
+  if (points === 0) return { points: 0, reason: null };
+
+  const where = opportunity.service_area || `${orgState}`;
+  return {
+    points,
+    reason: `+${points} local preference — ${scope}-level funder serving ${where}, `
+      + 'a far smaller applicant pool than national programs.'
+  };
 }
 
 /** Search terms derived from the org profile, so discovery reflects the org. */
@@ -164,6 +224,18 @@ async function runDiscovery(orgId, { keywords = null, maxScored = MAX_SCORED } =
       sourceErrors.push({ term, error: error.message });
     }
   }
+  // In-state funders. These come from a curated directory rather than an API —
+  // no state publishes one — so they cost nothing to include and are usually
+  // the best odds on the list.
+  const orgState = orgHomeState(org);
+  const directoryFor = orgState ? STATE_DIRECTORIES[orgState] : null;
+  if (directoryFor) {
+    for (const entry of directoryFor()) {
+      if (!seen.has(entry.source_id)) seen.set(entry.source_id, entry);
+    }
+    logger.info({ orgState }, 'Included in-state funder directory');
+  }
+
   const listings = [...seen.values()];
 
   // 2. Persist listings, skipping ones already dismissed or converted — a
@@ -226,9 +298,21 @@ async function runDiscovery(orgId, { keywords = null, maxScored = MAX_SCORED } =
   for (let i = 0; i < toScore.length; i++) {
     const score = scores.find(s => s.index === i) || {};
     const { checks } = prefilter(toScore[i].opportunity, org);
-    const match = await recordMatch(orgId, toScore[i], score, checks, null);
+    const boost = localityBoost(toScore[i].opportunity, org);
+
+    if (boost.points > 0 && typeof score.fit_score === 'number') {
+      score.fit_score = Math.min(100, score.fit_score + boost.points);
+      score.key_alignment = [boost.reason, ...(score.key_alignment || [])];
+    }
+
+    const match = await recordMatch(orgId, toScore[i], score, checks, null, boost.points);
     matches.push(match);
   }
+
+  // Rank before returning. The HTTP route sorts in SQL, but callers of this
+  // function directly (scheduler, tests, scripts) get the array as-is and
+  // would otherwise receive it in arbitrary insertion order.
+  matches.sort((a, b) => (b.fit_score ?? -1) - (a.fit_score ?? -1));
 
   const result = {
     discovered: listings.length,
@@ -246,7 +330,7 @@ async function runDiscovery(orgId, { keywords = null, maxScored = MAX_SCORED } =
 }
 
 /** Create or refresh one org's verdict on one opportunity. */
-async function recordMatch(orgId, entry, score, checks, forcedStatus) {
+async function recordMatch(orgId, entry, score, checks, forcedStatus, localBoost = 0) {
   const payload = {
     fit_score: typeof score.fit_score === 'number' ? score.fit_score : null,
     eligibility_verdict: score.eligibility_verdict || 'unknown',
@@ -254,6 +338,7 @@ async function recordMatch(orgId, entry, score, checks, forcedStatus) {
     key_alignment: score.key_alignment || [],
     concerns: score.concerns || [],
     prefilter_result: checks,
+    local_boost: localBoost,
     scored_at: new Date()
   };
 
@@ -280,6 +365,9 @@ module.exports = {
   prefilter,
   buildSearchTerms,
   eligibleApplicantCodes,
+  localityBoost,
+  orgHomeState,
   MIN_LEAD_DAYS,
-  MAX_SCORED
+  MAX_SCORED,
+  LOCALITY_BOOST
 };

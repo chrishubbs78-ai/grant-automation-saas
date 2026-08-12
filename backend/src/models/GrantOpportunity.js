@@ -80,6 +80,20 @@ module.exports = (sequelize) => {
       type: DataTypes.STRING(255),
       comment: 'Funding activity category (education, health, ...)'
     },
+    geographic_scope: {
+      type: DataTypes.STRING(20),
+      defaultValue: 'national',
+      comment: 'national, regional, state, county, city — drives local-preference weighting'
+    },
+    eligible_states: {
+      type: DataTypes.JSONB,
+      defaultValue: [],
+      comment: 'USPS codes this funder will fund, e.g. ["UT"]. Empty means unrestricted.'
+    },
+    service_area: {
+      type: DataTypes.STRING(255),
+      comment: 'Human-readable area, e.g. "Salt Lake County" or "Statewide Utah"'
+    },
     opportunity_status: {
       type: DataTypes.STRING(30),
       defaultValue: 'posted',

@@ -109,6 +109,16 @@ async function startServer() {
       ALTER TABLE grants
         ADD COLUMN IF NOT EXISTS opportunity_id UUID REFERENCES grant_opportunities(id)
     `);
+    await sequelize.query(`
+      ALTER TABLE grant_opportunities
+        ADD COLUMN IF NOT EXISTS geographic_scope VARCHAR(20) DEFAULT 'national',
+        ADD COLUMN IF NOT EXISTS eligible_states JSONB DEFAULT '[]',
+        ADD COLUMN IF NOT EXISTS service_area VARCHAR(255)
+    `);
+    await sequelize.query(`
+      ALTER TABLE opportunity_matches
+        ADD COLUMN IF NOT EXISTS local_boost INTEGER DEFAULT 0
+    `);
     console.log('Additive migrations applied');
 
     // Seed default user (persistent auth)

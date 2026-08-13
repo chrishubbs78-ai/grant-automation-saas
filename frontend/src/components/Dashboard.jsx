@@ -8,6 +8,7 @@ import BulkJobMonitor from './BulkJobMonitor';
 import FinancialsVault from './FinancialsVault';
 import ReapplyQueue from './ReapplyQueue';
 import OpportunityFeed from './OpportunityFeed';
+import PipelineTabs from './PipelineTabs';
 import { connectSocket, disconnectSocket } from '../services/socket';
 import '../styles/dashboard.css';
 
@@ -732,6 +733,8 @@ export default function Dashboard({ orgProfile, onEditProfile }) {
         )}
 
         {/* Reapply Queue */}
+        <PipelineTabs onChanged={() => { fetchGrants(currentFilters, pagination.page); fetchAnalytics(); }} />
+
         <OpportunityFeed onConverted={() => { fetchGrants(currentFilters, pagination.page); fetchAnalytics(); }} />
 
         <ReapplyQueue onReapplyComplete={() => { fetchGrants(currentFilters, pagination.page); fetchAnalytics(); }} />

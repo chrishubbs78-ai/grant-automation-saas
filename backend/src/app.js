@@ -56,6 +56,10 @@ app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/reapply', require('./routes/reapply'));
 app.use('/api/financials', require('./routes/financials'));
 app.use('/api/opportunities', require('./routes/opportunities'));
+app.use('/api/pipeline', require('./routes/pipeline'));
+app.use('/api/inbox', require('./routes/inbox'));
+// Per-application document checklist lives under the grant it belongs to.
+app.use('/api/grants', require('./routes/applicationDocuments'));
 app.use('/api/export', require('./routes/export'));
 
 // Health check
@@ -119,6 +123,11 @@ async function startServer() {
       ALTER TABLE opportunity_matches
         ADD COLUMN IF NOT EXISTS local_boost INTEGER DEFAULT 0
     `);
+    await sequelize.query(`
+      ALTER TABLE grants
+        ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMP WITH TIME ZONE,
+        ADD COLUMN IF NOT EXISTS outcome_recorded_at TIMESTAMP WITH TIME ZONE
+    `);
     console.log('Additive migrations applied');
 
     // Seed default user (persistent auth)
@@ -135,6 +144,10 @@ async function startServer() {
     // Opt-in periodic opportunity discovery (off unless AUTO_DISCOVERY_ENABLED=true)
     const { startDiscoveryScheduler } = require('./services/discoveryScheduler');
     startDiscoveryScheduler();
+
+    // Opt-in daily inbox scan (off unless EMAIL_SCAN_ENABLED=true)
+    const { startEmailScanScheduler } = require('./services/emailScanScheduler');
+    startEmailScanScheduler();
 
     // Initialize Socket.IO on the HTTP server
     const io = new Server(httpServer, {

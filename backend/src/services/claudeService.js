@@ -206,6 +206,100 @@ function getMockMatchScores(orgProfile, opportunities) {
   });
 }
 
+// ─── FUNDER EMAIL CLASSIFICATION ──────────────────────────────────────────────
+
+/**
+ * Classify a batch of emails that appear to be funder responses.
+ *
+ * Batched for the same reason as opportunity scoring: the instructions dominate
+ * the request, so one call with N short excerpts beats N calls.
+ *
+ * The output feeds a human review queue, never an automatic status change, so
+ * the prompt is told to say "unclear" rather than guess. A confident wrong
+ * answer here silently marks a live application dead.
+ */
+async function classifyFunderEmails({ emails }) {
+  if (!emails || emails.length === 0) return [];
+
+  if (USE_MOCK_API) {
+    console.log('[MOCK] Classifying funder emails with mock Claude response...');
+    return getMockEmailClassifications(emails);
+  }
+
+  const block = emails.map((e, i) => `
+[${i}] Regarding application to: ${e.funder}
+From: ${e.from}
+Subject: ${e.subject}
+Excerpt: ${(e.snippet || '').substring(0, 1200)}`).join('\n');
+
+  const message = await anthropic.messages.create({
+    model: MODEL,
+    max_tokens: 4000,
+    messages: [{
+      role: 'user',
+      content: `You are reviewing an inbox on behalf of a nonprofit that has grant applications pending. For each email, decide what it says about the application's status.
+
+Prefer "unclear" over a guess. Your output is shown to a person who will decide what to do; a wrong confident answer is far more damaging than an honest "I could not tell", because it can mark a still-live application as dead.
+
+Categories:
+  awarded               — the application was approved or funded
+  rejected              — the application was declined
+  information_requested — the funder needs something more from the applicant
+  acknowledgment        — receipt confirmation or routine status note, no decision
+  deadline_change       — a date moved
+  unclear               — anything else, including newsletters and marketing
+
+Return ONLY a JSON array, one object per email, in the same order:
+[
+  {
+    "index": 0,
+    "classification": "one of the categories above",
+    "confidence": "high" | "medium" | "low",
+    "reasoning": "one sentence pointing at the specific wording that decided it"
+  }
+]
+
+EMAILS:
+${block}`
+    }]
+  });
+
+  try {
+    const text = message.content[0].text.trim();
+    const start = text.indexOf('[');
+    const end = text.lastIndexOf(']');
+    const parsed = JSON.parse(start >= 0 ? text.slice(start, end + 1) : text);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    console.error('Failed to parse email classifications:', message.content[0].text.substring(0, 300));
+    return [];
+  }
+}
+
+/** Keyword stand-in for demo mode. Conservative: unknown wording stays unclear. */
+function getMockEmailClassifications(emails) {
+  const RULES = [
+    { re: /congratulat|pleased to inform|has been (approved|awarded|funded)|award notice/i, c: 'awarded', conf: 'high' },
+    { re: /regret to inform|not (be |been )?(selected|funded|approved)|unable to fund|declin/i, c: 'rejected', conf: 'high' },
+    { re: /additional information|please (provide|submit|send)|request(ing)? (further|more)|missing/i, c: 'information_requested', conf: 'medium' },
+    { re: /deadline (has )?(moved|changed|extended)|new due date/i, c: 'deadline_change', conf: 'medium' },
+    { re: /(receipt|received your|confirming|acknowledge)/i, c: 'acknowledgment', conf: 'medium' }
+  ];
+
+  return emails.map((e, index) => {
+    const text = `${e.subject || ''} ${e.snippet || ''}`;
+    const hit = RULES.find(r => r.re.test(text));
+    return {
+      index,
+      classification: hit ? hit.c : 'unclear',
+      confidence: hit ? hit.conf : 'low',
+      reasoning: hit
+        ? `Matched wording associated with a ${hit.c.replace('_', ' ')}. Keyword rule — a Claude API key replaces this with real reading.`
+        : 'No decisive wording found. Keyword rule — a Claude API key replaces this with real reading.'
+    };
+  });
+}
+
 // ─── ORG PROFILE CONTEXT BUILDER ──────────────────────────────────────────────
 
 function buildOrgContext(org) {
@@ -432,5 +526,6 @@ module.exports = {
   generateDraft,
   generateImprovedDraft,
   scoreOpportunityMatches,
+  classifyFunderEmails,
   buildOrgContext
 };

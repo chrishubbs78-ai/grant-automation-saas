@@ -355,6 +355,28 @@ function getMockOpportunities(keyword = '') {
   return filtered.length > 0 ? filtered : catalog;
 }
 
+
+// Mock ProPublica Nonprofit Explorer results — mirrors the real v2 search
+// payload (string EINs, NTEE codes, filings_with_data) so the normalizer and
+// filing summarizer are exercised for real.
+function getMockPropublicaOrgs(state = 'UT') {
+  return [
+    { ein: '876102547', name: 'Wasatch Education Trust', city: 'Salt Lake City', state,
+      ntee_code: 'B11', filings_with_data: [{ tax_prd_yr: 2024, grntspaid: 2400000, totassetsend: 48000000, totrevenue: 3100000 }] },
+    { ein: '870562814', name: 'Beehive Youth Foundation', city: 'Provo', state,
+      ntee_code: 'O50', filings_with_data: [{ tax_prd_yr: 2024, grntspaid: 860000, totassetsend: 19500000, totrevenue: 1200000 }] },
+    { ein: '813377291', name: 'Canyon Family Charitable Trust', city: 'Ogden', state,
+      ntee_code: 'P20', filings_with_data: [{ tax_prd_yr: 2023, grntspaid: 415000, totassetsend: 9800000, totrevenue: 640000 }] },
+    { ein: '842019955', name: 'Great Salt Lake Conservation Fund', city: 'Salt Lake City', state,
+      ntee_code: 'C30', filings_with_data: [{ tax_prd_yr: 2024, grntspaid: 1100000, totassetsend: 22000000, totrevenue: 1500000 }] },
+    { ein: '870998112', name: 'Deseret Arts Endowment', city: 'Salt Lake City', state,
+      ntee_code: 'A20', filings_with_data: [{ tax_prd_yr: 2024, grntspaid: 320000, totassetsend: 7400000, totrevenue: 500000 }] },
+    // Sits below the grantmaking floor — exercises the "assets but no giving" filter
+    { ein: '830114772', name: 'Dormant Legacy Trust', city: 'Sandy', state,
+      ntee_code: 'T20', filings_with_data: [{ tax_prd_yr: 2023, grntspaid: 4000, totassetsend: 31000000, totrevenue: 900000 }] }
+  ];
+}
+
 // Mock improved draft for reapplications
 function getMockImprovedDraft({ orgProfile, rfpAnalysis, previousDraft, rejectionFeedback }) {
   const base = getMockDraft({ orgProfile: orgProfile || {}, rfpAnalysis: rfpAnalysis || {} });
@@ -379,5 +401,6 @@ module.exports = {
   getMockDraft,
   getMockImprovedDraft,
   getMockBusinessPlanAnalysis,
-  getMockOpportunities
+  getMockOpportunities,
+  getMockPropublicaOrgs
 };

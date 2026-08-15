@@ -15,6 +15,7 @@
 const { GrantOpportunity, OpportunityMatch, Organization } = require('../models');
 const { searchOpportunities, fetchOpportunityDetail } = require('./grantsGovService');
 const { getUtahFunders } = require('./utahFunderDirectory');
+const { findGrantmakers } = require('./propublicaService');
 const { scoreOpportunityMatches } = require('./claudeService');
 const logger = require('../utils/logger');
 
@@ -28,6 +29,51 @@ const LOCALITY_BOOST = { city: 20, county: 20, state: 15, regional: 8, national:
 
 /** In-state directories to consult, keyed by the org's own state. */
 const STATE_DIRECTORIES = { UT: getUtahFunders };
+
+/**
+ * NTEE major groups worth searching for an org, inferred from its mission.
+ * An empty list means "do not filter by field" rather than "match nothing".
+ */
+const NTEE_KEYWORDS = {
+  B: ['education', 'school', 'student', 'literacy', 'tutoring', 'stem', 'academic', 'learning'],
+  O: ['youth', 'mentoring', 'mentorship', 'teen', 'adolescent', 'after-school', 'afterschool'],
+  P: ['human services', 'family', 'families', 'poverty', 'homeless', 'welfare', 'childcare'],
+  E: ['health', 'clinic', 'medical', 'wellness'],
+  F: ['mental health', 'counseling', 'behavioral', 'crisis'],
+  A: ['arts', 'music', 'theater', 'theatre', 'museum', 'cultural', 'dance'],
+  K: ['food', 'nutrition', 'hunger', 'meals', 'pantry'],
+  L: ['housing', 'shelter', 'rent', 'homelessness'],
+  J: ['workforce', 'employment', 'job training', 'career'],
+  C: ['environment', 'conservation', 'watershed', 'climate', 'habitat'],
+  N: ['recreation', 'sports', 'athletic', 'camp'],
+  S: ['community development', 'neighborhood', 'economic development']
+};
+
+function nteeFieldsFor(org) {
+  const text = [
+    org.mission, org.problemStatement, org.targetPopulation,
+    ...(org.programsAndServices || []).map(p => `${p.name} ${p.description}`)
+  ].filter(Boolean).join(' ').toLowerCase();
+
+  if (!text.trim()) return [];
+
+  const fields = Object.entries(NTEE_KEYWORDS)
+    .filter(([, words]) => words.some(w => text.includes(w)))
+    .map(([letter]) => letter);
+
+  // T = philanthropy/grantmaking. Many family foundations classify themselves
+  // there regardless of what they fund, so always keep them in scope.
+  return fields.length > 0 ? [...new Set([...fields, 'T'])] : [];
+}
+
+/** Compare funder names across sources without punctuation or legal suffixes. */
+function normalizeFunderName(name) {
+  return String(name || '')
+    .toLowerCase()
+    .replace(/\b(the|inc|llc|foundation|trust|fund|charitable|family|endowment)\b/g, '')
+    .replace(/[^a-z0-9]/g, '')
+    .trim();
+}
 
 // Applying takes real work; anything closing sooner than this isn't actionable.
 const MIN_LEAD_DAYS = parseInt(process.env.MATCH_MIN_LEAD_DAYS || '10', 10);
@@ -229,11 +275,36 @@ async function runDiscovery(orgId, { keywords = null, maxScored = MAX_SCORED } =
   // the best odds on the list.
   const orgState = orgHomeState(org);
   const directoryFor = orgState ? STATE_DIRECTORIES[orgState] : null;
+  const curatedNames = [];
   if (directoryFor) {
     for (const entry of directoryFor()) {
       if (!seen.has(entry.source_id)) seen.set(entry.source_id, entry);
+      curatedNames.push(normalizeFunderName(entry.agency));
     }
     logger.info({ orgState }, 'Included in-state funder directory');
+  }
+
+  // IRS 990 grantmakers in the same state — foundations that actually paid
+  // grants, ranked by how much. Skipped when the org has no address, since
+  // there is no state to search.
+  if (orgState) {
+    try {
+      const grantmakers = await findGrantmakers({
+        state: orgState,
+        fields: nteeFieldsFor(org),
+        limit: parseInt(process.env.PROPUBLICA_LIMIT || '20', 10)
+      });
+      for (const entry of grantmakers) {
+        // A hand-verified directory entry beats a generic 990 record for the
+        // same funder — keep the curated one and drop the duplicate.
+        if (curatedNames.includes(normalizeFunderName(entry.agency))) continue;
+        if (!seen.has(entry.source_id)) seen.set(entry.source_id, entry);
+      }
+      logger.info({ orgState, added: grantmakers.length }, 'Included IRS 990 grantmakers');
+    } catch (error) {
+      logger.warn({ error: error.message }, 'ProPublica lookup failed; continuing without it');
+      sourceErrors.push({ term: 'propublica_990', error: error.message });
+    }
   }
 
   const listings = [...seen.values()];
@@ -367,6 +438,8 @@ module.exports = {
   eligibleApplicantCodes,
   localityBoost,
   orgHomeState,
+  nteeFieldsFor,
+  normalizeFunderName,
   MIN_LEAD_DAYS,
   MAX_SCORED,
   LOCALITY_BOOST

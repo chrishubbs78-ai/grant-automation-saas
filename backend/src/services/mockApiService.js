@@ -285,6 +285,98 @@ function getMockBusinessPlanAnalysis(planText) {
   };
 }
 
+// Mock Grants.gov search hits — deliberately mirrors the real search2 payload
+// shape (MM/DD/YYYY dates, string ids) so the normalizer is exercised for real.
+function getMockOpportunities(keyword = '') {
+  const inDays = (n) => {
+    const d = new Date(Date.now() + n * 24 * 60 * 60 * 1000);
+    return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
+  };
+
+  const catalog = [
+    {
+      id: '354001',
+      number: 'ED-GRANTS-YOUTH-2026',
+      title: '21st Century Community Learning Centers — After-School Programs',
+      agency: 'Department of Education',
+      agencyCode: 'ED',
+      openDate: inDays(-14),
+      closeDate: inDays(65),
+      oppStatus: 'posted'
+    },
+    {
+      id: '354002',
+      number: 'HHS-ACF-YOUTH-2026',
+      title: 'Youth Development and Mentoring Program Grants',
+      agency: 'Administration for Children and Families',
+      agencyCode: 'HHS-ACF',
+      openDate: inDays(-30),
+      closeDate: inDays(45),
+      oppStatus: 'posted'
+    },
+    {
+      id: '354003',
+      number: 'NSF-STEM-ED-2026',
+      title: 'Advancing Informal STEM Learning (AISL)',
+      agency: 'National Science Foundation',
+      agencyCode: 'NSF',
+      openDate: inDays(-7),
+      closeDate: inDays(120),
+      oppStatus: 'posted'
+    },
+    {
+      id: '354004',
+      number: 'DOT-INFRA-RAIL-2026',
+      title: 'Freight Rail Infrastructure Modernization',
+      agency: 'Department of Transportation',
+      agencyCode: 'DOT',
+      openDate: inDays(-20),
+      closeDate: inDays(80),
+      oppStatus: 'posted'
+    },
+    {
+      id: '354005',
+      number: 'USDA-NIFA-CFP-2026',
+      title: 'Community Food Projects Competitive Grants',
+      agency: 'National Institute of Food and Agriculture',
+      agencyCode: 'USDA-NIFA',
+      openDate: inDays(-45),
+      closeDate: inDays(3), // deadline too close — exercises the lead-time prefilter
+      oppStatus: 'posted'
+    }
+  ];
+
+  if (!keyword) return catalog;
+  const needle = keyword.toLowerCase();
+  const filtered = catalog.filter(o =>
+    o.title.toLowerCase().includes(needle) || o.agency.toLowerCase().includes(needle)
+  );
+  // Never return an empty feed in demo mode — an empty dashboard reads as a bug.
+  return filtered.length > 0 ? filtered : catalog;
+}
+
+
+// Mock ProPublica Nonprofit Explorer results — mirrors the real v2 search
+// payload (string EINs, NTEE codes, filings_with_data) so the normalizer and
+// filing summarizer are exercised for real.
+function getMockPropublicaOrgs(state = 'UT') {
+  return [
+    { ein: '876102547', name: 'Wasatch Education Trust', city: 'Salt Lake City', state,
+      ntee_code: 'B11', filings_with_data: [{ tax_prd_yr: 2024, grntspaid: 2400000, totassetsend: 48000000, totrevenue: 3100000 }] },
+    { ein: '870562814', name: 'Beehive Youth Foundation', city: 'Provo', state,
+      ntee_code: 'O50', filings_with_data: [{ tax_prd_yr: 2024, grntspaid: 860000, totassetsend: 19500000, totrevenue: 1200000 }] },
+    { ein: '813377291', name: 'Canyon Family Charitable Trust', city: 'Ogden', state,
+      ntee_code: 'P20', filings_with_data: [{ tax_prd_yr: 2023, grntspaid: 415000, totassetsend: 9800000, totrevenue: 640000 }] },
+    { ein: '842019955', name: 'Great Salt Lake Conservation Fund', city: 'Salt Lake City', state,
+      ntee_code: 'C30', filings_with_data: [{ tax_prd_yr: 2024, grntspaid: 1100000, totassetsend: 22000000, totrevenue: 1500000 }] },
+    { ein: '870998112', name: 'Deseret Arts Endowment', city: 'Salt Lake City', state,
+      ntee_code: 'A20', filings_with_data: [{ tax_prd_yr: 2024, grntspaid: 320000, totassetsend: 7400000, totrevenue: 500000 }] },
+    // Sits below the grantmaking floor — exercises the "assets but no giving" filter
+    { ein: '830114772', name: 'Dormant Legacy Trust', city: 'Sandy', state,
+      ntee_code: 'T20', filings_with_data: [{ tax_prd_yr: 2023, grntspaid: 4000, totassetsend: 31000000, totrevenue: 900000 }] }
+  ];
+}
+
 // Mock improved draft for reapplications
 function getMockImprovedDraft({ orgProfile, rfpAnalysis, previousDraft, rejectionFeedback }) {
   const base = getMockDraft({ orgProfile: orgProfile || {}, rfpAnalysis: rfpAnalysis || {} });
@@ -308,5 +400,7 @@ module.exports = {
   getMockFunderResearch,
   getMockDraft,
   getMockImprovedDraft,
-  getMockBusinessPlanAnalysis
+  getMockBusinessPlanAnalysis,
+  getMockOpportunities,
+  getMockPropublicaOrgs
 };

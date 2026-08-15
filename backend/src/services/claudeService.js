@@ -99,6 +99,207 @@ Return exactly this JSON structure:
   }
 }
 
+// ─── OPPORTUNITY MATCH SCORING ────────────────────────────────────────────────
+
+/**
+ * Score a batch of opportunities against one organization in a SINGLE call.
+ *
+ * Batching is the whole point: the org profile is ~2k tokens and dominates the
+ * request. Scoring 15 opportunities individually would resend it 15 times
+ * (~30k tokens); sending it once with 15 short candidate summaries is ~6k.
+ * Same information, roughly a fifth of the cost, and the model can rank
+ * candidates relative to each other instead of in isolation.
+ */
+async function scoreOpportunityMatches({ orgProfile, opportunities }) {
+  if (!opportunities || opportunities.length === 0) return [];
+
+  if (USE_MOCK_API) {
+    console.log('[MOCK] Scoring opportunity matches with mock Claude response...');
+    return getMockMatchScores(orgProfile, opportunities);
+  }
+
+  const orgContext = buildOrgContext(orgProfile);
+
+  const candidateBlock = opportunities.map((opp, i) => `
+[${i}] ${opp.title}
+Agency: ${opp.agency || 'Unknown'}
+Deadline: ${opp.close_date ? new Date(opp.close_date).toISOString().slice(0, 10) : 'Not specified'}
+Award range: $${opp.award_floor?.toLocaleString() || '?'} – $${opp.award_ceiling?.toLocaleString() || '?'}
+Eligibility: ${(opp.eligibility_text || 'Not specified').substring(0, 400)}
+Description: ${(opp.description || opp.title).substring(0, 1200)}`).join('\n');
+
+  const message = await anthropic.messages.create({
+    model: MODEL,
+    max_tokens: 8000,
+    messages: [{
+      role: 'user',
+      content: `You are a grant strategist advising a nonprofit on which funding opportunities are worth pursuing. Score each candidate for fit with THIS organization.
+
+Be discriminating and honest. A high score must be earned: most opportunities are a poor fit for any given organization, and telling someone to chase a grant they cannot win wastes weeks of their time. Weigh mission alignment, eligibility, award size versus organizational capacity, and whether their documented track record matches what the funder is buying.
+
+Scoring guide:
+  80-100  Strong fit — squarely in their mission, clearly eligible, winnable
+  60-79   Worth pursuing — good alignment with a gap or two
+  40-59   Marginal — plausible but a stretch
+  0-39    Poor fit — wrong mission, ineligible, or unwinnable
+
+Return ONLY a JSON array, one object per candidate, in the same order, no other text:
+[
+  {
+    "index": 0,
+    "fit_score": 0-100,
+    "eligibility_verdict": "eligible" | "likely_eligible" | "ineligible" | "unknown",
+    "rationale": "2-3 sentences explaining the score in plain language",
+    "key_alignment": ["specific reason this org fits", "..."],
+    "concerns": ["specific gap, risk, or missing capability", "..."]
+  }
+]
+
+ORGANIZATION PROFILE:
+${orgContext}
+
+CANDIDATE OPPORTUNITIES:
+${candidateBlock}`
+    }]
+  });
+
+  try {
+    const text = message.content[0].text.trim();
+    // Models occasionally wrap JSON in prose or a code fence; take the array.
+    const start = text.indexOf('[');
+    const end = text.lastIndexOf(']');
+    const parsed = JSON.parse(start >= 0 ? text.slice(start, end + 1) : text);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    console.error('Failed to parse opportunity match scores:', message.content[0].text.substring(0, 300));
+    return [];
+  }
+}
+
+/**
+ * Deterministic stand-in for match scoring in mock/demo mode. Scores on
+ * keyword overlap between the org's mission and the opportunity text so the
+ * demo feed ranks plausibly instead of returning uniform noise.
+ */
+function getMockMatchScores(orgProfile, opportunities) {
+  const STOP = new Set(['the', 'and', 'for', 'with', 'that', 'this', 'our', 'are', 'from', 'their', 'who', 'all', 'has', 'been', 'more', 'have', 'will', 'grants', 'grant', 'program', 'programs']);
+  const orgTerms = new Set(
+    `${orgProfile.mission || ''} ${orgProfile.problemStatement || ''} ${orgProfile.targetPopulation || ''} ${orgProfile.name || ''}`
+      .toLowerCase().match(/[a-z]{3,}/g)?.filter(w => !STOP.has(w)) || []
+  );
+
+  return opportunities.map((opp, index) => {
+    const oppTerms = `${opp.title} ${opp.description || ''}`.toLowerCase().match(/[a-z]{3,}/g) || [];
+    const overlap = [...new Set(oppTerms)].filter(t => orgTerms.has(t));
+    const score = Math.max(12, Math.min(94, 30 + overlap.length * 11));
+
+    return {
+      index,
+      fit_score: score,
+      eligibility_verdict: score >= 55 ? 'likely_eligible' : 'unknown',
+      rationale: overlap.length
+        ? `Overlaps with your stated focus on ${overlap.slice(0, 3).join(', ')}. Demo-mode score based on keyword alignment — add a Claude API key for real strategic scoring.`
+        : 'No clear overlap with your mission as written. Demo-mode score based on keyword alignment — add a Claude API key for real strategic scoring.',
+      key_alignment: overlap.slice(0, 3).map(t => `Mentions "${t}", which appears in your profile`),
+      concerns: overlap.length ? [] : ['Mission alignment is not obvious from the opportunity text']
+    };
+  });
+}
+
+// ─── FUNDER EMAIL CLASSIFICATION ──────────────────────────────────────────────
+
+/**
+ * Classify a batch of emails that appear to be funder responses.
+ *
+ * Batched for the same reason as opportunity scoring: the instructions dominate
+ * the request, so one call with N short excerpts beats N calls.
+ *
+ * The output feeds a human review queue, never an automatic status change, so
+ * the prompt is told to say "unclear" rather than guess. A confident wrong
+ * answer here silently marks a live application dead.
+ */
+async function classifyFunderEmails({ emails }) {
+  if (!emails || emails.length === 0) return [];
+
+  if (USE_MOCK_API) {
+    console.log('[MOCK] Classifying funder emails with mock Claude response...');
+    return getMockEmailClassifications(emails);
+  }
+
+  const block = emails.map((e, i) => `
+[${i}] Regarding application to: ${e.funder}
+From: ${e.from}
+Subject: ${e.subject}
+Excerpt: ${(e.snippet || '').substring(0, 1200)}`).join('\n');
+
+  const message = await anthropic.messages.create({
+    model: MODEL,
+    max_tokens: 4000,
+    messages: [{
+      role: 'user',
+      content: `You are reviewing an inbox on behalf of a nonprofit that has grant applications pending. For each email, decide what it says about the application's status.
+
+Prefer "unclear" over a guess. Your output is shown to a person who will decide what to do; a wrong confident answer is far more damaging than an honest "I could not tell", because it can mark a still-live application as dead.
+
+Categories:
+  awarded               — the application was approved or funded
+  rejected              — the application was declined
+  information_requested — the funder needs something more from the applicant
+  acknowledgment        — receipt confirmation or routine status note, no decision
+  deadline_change       — a date moved
+  unclear               — anything else, including newsletters and marketing
+
+Return ONLY a JSON array, one object per email, in the same order:
+[
+  {
+    "index": 0,
+    "classification": "one of the categories above",
+    "confidence": "high" | "medium" | "low",
+    "reasoning": "one sentence pointing at the specific wording that decided it"
+  }
+]
+
+EMAILS:
+${block}`
+    }]
+  });
+
+  try {
+    const text = message.content[0].text.trim();
+    const start = text.indexOf('[');
+    const end = text.lastIndexOf(']');
+    const parsed = JSON.parse(start >= 0 ? text.slice(start, end + 1) : text);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    console.error('Failed to parse email classifications:', message.content[0].text.substring(0, 300));
+    return [];
+  }
+}
+
+/** Keyword stand-in for demo mode. Conservative: unknown wording stays unclear. */
+function getMockEmailClassifications(emails) {
+  const RULES = [
+    { re: /congratulat|pleased to inform|has been (approved|awarded|funded)|award notice/i, c: 'awarded', conf: 'high' },
+    { re: /regret to inform|not (be |been )?(selected|funded|approved)|unable to fund|declin/i, c: 'rejected', conf: 'high' },
+    { re: /additional information|please (provide|submit|send)|request(ing)? (further|more)|missing/i, c: 'information_requested', conf: 'medium' },
+    { re: /deadline (has )?(moved|changed|extended)|new due date/i, c: 'deadline_change', conf: 'medium' },
+    { re: /(receipt|received your|confirming|acknowledge)/i, c: 'acknowledgment', conf: 'medium' }
+  ];
+
+  return emails.map((e, index) => {
+    const text = `${e.subject || ''} ${e.snippet || ''}`;
+    const hit = RULES.find(r => r.re.test(text));
+    return {
+      index,
+      classification: hit ? hit.c : 'unclear',
+      confidence: hit ? hit.conf : 'low',
+      reasoning: hit
+        ? `Matched wording associated with a ${hit.c.replace('_', ' ')}. Keyword rule — a Claude API key replaces this with real reading.`
+        : 'No decisive wording found. Keyword rule — a Claude API key replaces this with real reading.'
+    };
+  });
+}
+
 // ─── ORG PROFILE CONTEXT BUILDER ──────────────────────────────────────────────
 
 function buildOrgContext(org) {
@@ -319,4 +520,12 @@ ${(recommendations || []).map(r => `• ${r.message || r}`).join('\n') || 'None'
   }
 }
 
-module.exports = { parseRFP, parseBusinessPlan, generateDraft, generateImprovedDraft };
+module.exports = {
+  parseRFP,
+  parseBusinessPlan,
+  generateDraft,
+  generateImprovedDraft,
+  scoreOpportunityMatches,
+  classifyFunderEmails,
+  buildOrgContext
+};

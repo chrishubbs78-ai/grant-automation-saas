@@ -23,6 +23,10 @@ const BulkJob = require('./BulkJob');
 const ReapplyCandidate = require('./ReapplyCandidate');
 const FinancialDocument = require('./FinancialDocument');
 const User = require('./User');
+const GrantOpportunity = require('./GrantOpportunity');
+const OpportunityMatch = require('./OpportunityMatch');
+const ApplicationDocument = require('./ApplicationDocument');
+const EmailFinding = require('./EmailFinding');
 
 // Initialize models
 const models = {
@@ -36,7 +40,11 @@ const models = {
   BulkJob: BulkJob(sequelize),
   ReapplyCandidate: ReapplyCandidate(sequelize),
   FinancialDocument: FinancialDocument(sequelize),
-  User: User(sequelize)
+  User: User(sequelize),
+  GrantOpportunity: GrantOpportunity(sequelize),
+  OpportunityMatch: OpportunityMatch(sequelize),
+  ApplicationDocument: ApplicationDocument(sequelize),
+  EmailFinding: EmailFinding(sequelize)
 };
 
 // Define associations

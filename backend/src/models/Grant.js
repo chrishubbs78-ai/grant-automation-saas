@@ -54,6 +54,11 @@ module.exports = (sequelize) => {
       defaultValue: 0,
       comment: 'How many times this opportunity has been reapplied to'
     },
+    opportunity_id: {
+      type: DataTypes.UUID,
+      references: { model: 'grant_opportunities', key: 'id' },
+      comment: 'Discovered opportunity this application came from, if any'
+    },
     created_at: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW

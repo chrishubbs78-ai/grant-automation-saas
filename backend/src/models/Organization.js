@@ -197,6 +197,36 @@ module.exports = (sequelize) => {
       defaultValue: {},
       comment: 'Full questionnaire responses'
     },
+    // Applicant structure. A for-profit business can still reach charitable
+    // money by running its community program under a nonprofit fiscal sponsor.
+    entityType: {
+      type: DataTypes.STRING(40),
+      defaultValue: 'nonprofit',
+      comment: 'nonprofit, for_profit_small_business, hybrid (for-profit business + fiscally sponsored program)'
+    },
+    fiscalSponsor: {
+      type: DataTypes.JSONB,
+      defaultValue: {},
+      comment: '{ name, ein, contact_name, contact_email, fee_pct, agreement_status, program_name }'
+    },
+    // Lender-facing facts the loan readiness check and loan packet draw on.
+    loanProfile: {
+      type: DataTypes.JSONB,
+      defaultValue: {},
+      comment: '{ amount_needed, use_of_funds[], owner_credit_score, owner_equity, collateral, months_in_business, startup_costs, monthly_revenue_projection, has_projections, has_tax_returns, has_personal_financial_statement, industry_experience_years }'
+    },
+    // Answers collected by the guided business plan builder, keyed by question id.
+    businessPlanBuilder: {
+      type: DataTypes.JSONB,
+      defaultValue: {},
+      comment: '{ answers: { [questionId]: string }, research: { [sectionKey]: {...} }, last_review: {...} }'
+    },
+    // What the automation runner may do without asking each time.
+    automationSettings: {
+      type: DataTypes.JSONB,
+      defaultValue: {},
+      comment: '{ enabled, auto_discover, auto_draft_min_score, gmail_drafts, auto_send_email_submissions, calendar_sync, drive_sync, reminder_days[] }'
+    },
     createdAt: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW

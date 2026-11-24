@@ -2,7 +2,7 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const { verifyToken } = require('../middleware/auth');
 const { Organization, Grant, RFPAnalysis, Draft, Analytics } = require('../models');
-const { generateDraft } = require('../services/claudeService');
+const { generateAndStoreDraft } = require('../services/draftPipeline');
 const { emitToUser } = require('../services/socketService');
 const { safeError } = require('../utils/safeError');
 const rateLimit = require('express-rate-limit');
@@ -156,38 +156,12 @@ async function processDraft(jobId, rfpAnalysisId, orgId, org, userId) {
     jobStatus.set(jobId, { status: 'processing', progress: 40, orgId });
     emitToUser(userId, 'draft:progress', { jobId, progress: 40, status: 'processing' });
 
-    // Pull learning analytics to feed into draft generation
-    const analytics = await Analytics.findOne({ where: { org_id: orgId } });
-
-    // Generate expert draft with full org profile + RFP context + learning insights
+    // Lane-aware, funder-tailored draft (shared with the automation runner)
     logger.info({ jobId, orgId }, 'Generating expert draft with Claude...');
-    const draft = await generateDraft({
-      orgProfile: org.get({ plain: true }),
-      rfpAnalysis: rfp.get({ plain: true }),
-      analytics: analytics ? analytics.get({ plain: true }) : null
-    });
+    const { draft: draftRecord } = await generateAndStoreDraft({ org, rfp });
 
     jobStatus.set(jobId, { status: 'processing', progress: 80, orgId });
     emitToUser(userId, 'draft:progress', { jobId, progress: 80, status: 'processing' });
-
-    // Store all 8 draft sections in database
-    const draftRecord = await Draft.create({
-      grant_id: rfp.grant_id,
-      org_id: orgId,
-      version: 1,
-      // Legacy fields (mapped for backward compat)
-      problem_statement: draft.statement_of_need || draft.problem_statement || '',
-      impact_statement: draft.goals_and_objectives || draft.impact_statement || '',
-      budget_narrative: draft.budget_narrative || '',
-      // New expert sections
-      executive_summary: draft.executive_summary || '',
-      organization_background: draft.organization_background || '',
-      statement_of_need: draft.statement_of_need || '',
-      goals_and_objectives: draft.goals_and_objectives || '',
-      program_design: draft.program_design || '',
-      evaluation_plan: draft.evaluation_plan || '',
-      sustainability_plan: draft.sustainability_plan || ''
-    });
 
     const draftPlain = draftRecord.get({ plain: true });
     jobStatus.set(jobId, { status: 'complete', progress: 100, orgId, draft: draftPlain });

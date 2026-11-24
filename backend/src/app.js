@@ -55,7 +55,17 @@ app.use('/api/outcomes', require('./routes/outcomes'));
 app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/reapply', require('./routes/reapply'));
 app.use('/api/financials', require('./routes/financials'));
+app.use('/api/opportunities', require('./routes/opportunities'));
+app.use('/api/pipeline', require('./routes/pipeline'));
+app.use('/api/inbox', require('./routes/inbox'));
+// Per-application document checklist lives under the grant it belongs to.
+app.use('/api/grants', require('./routes/applicationDocuments'));
 app.use('/api/export', require('./routes/export'));
+app.use('/api/loans', require('./routes/loans'));
+app.use('/api/business-plan', require('./routes/businessPlan'));
+app.use('/api/google', require('./routes/google'));
+app.use('/api/automation', require('./routes/automation'));
+app.use('/api/calendar', require('./routes/calendar'));
 
 // Health check
 app.get('/health', (req, res) => {
@@ -102,6 +112,42 @@ async function startServer() {
         ADD COLUMN IF NOT EXISTS "businessPlanFileName" VARCHAR(255),
         ADD COLUMN IF NOT EXISTS "businessPlanUploadedAt" TIMESTAMP WITH TIME ZONE
     `);
+    // grant_opportunities is created by sync() above, so the FK target exists
+    // by the time this runs on an upgrade.
+    await sequelize.query(`
+      ALTER TABLE grants
+        ADD COLUMN IF NOT EXISTS opportunity_id UUID REFERENCES grant_opportunities(id)
+    `);
+    await sequelize.query(`
+      ALTER TABLE grant_opportunities
+        ADD COLUMN IF NOT EXISTS geographic_scope VARCHAR(20) DEFAULT 'national',
+        ADD COLUMN IF NOT EXISTS eligible_states JSONB DEFAULT '[]',
+        ADD COLUMN IF NOT EXISTS service_area VARCHAR(255)
+    `);
+    await sequelize.query(`
+      ALTER TABLE opportunity_matches
+        ADD COLUMN IF NOT EXISTS local_boost INTEGER DEFAULT 0
+    `);
+    await sequelize.query(`
+      ALTER TABLE grants
+        ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMP WITH TIME ZONE,
+        ADD COLUMN IF NOT EXISTS outcome_recorded_at TIMESTAMP WITH TIME ZONE
+    `);
+    await sequelize.query(`
+      ALTER TABLE organizations
+        ADD COLUMN IF NOT EXISTS "entityType" VARCHAR(40) DEFAULT 'nonprofit',
+        ADD COLUMN IF NOT EXISTS "fiscalSponsor" JSONB DEFAULT '{}',
+        ADD COLUMN IF NOT EXISTS "loanProfile" JSONB DEFAULT '{}',
+        ADD COLUMN IF NOT EXISTS "businessPlanBuilder" JSONB DEFAULT '{}',
+        ADD COLUMN IF NOT EXISTS "automationSettings" JSONB DEFAULT '{}'
+    `);
+    await sequelize.query(`
+      ALTER TABLE grants
+        ADD COLUMN IF NOT EXISTS applicant_lane VARCHAR(30) DEFAULT 'organization',
+        ADD COLUMN IF NOT EXISTS submission_method VARCHAR(30),
+        ADD COLUMN IF NOT EXISTS submission_email VARCHAR(255),
+        ADD COLUMN IF NOT EXISTS google JSONB DEFAULT '{}'
+    `);
     console.log('Additive migrations applied');
 
     // Seed default user (persistent auth)
@@ -114,6 +160,18 @@ async function startServer() {
     // Start background auto-reapply checks
     const { startReapplyScheduler } = require('./services/reapplyScheduler');
     startReapplyScheduler();
+
+    // Opt-in periodic opportunity discovery (off unless AUTO_DISCOVERY_ENABLED=true)
+    const { startDiscoveryScheduler } = require('./services/discoveryScheduler');
+    startDiscoveryScheduler();
+
+    // Opt-in daily inbox scan (off unless EMAIL_SCAN_ENABLED=true)
+    const { startEmailScanScheduler } = require('./services/emailScanScheduler');
+    startEmailScanScheduler();
+
+    // Opt-in automation runner (off unless AUTOMATION_ENABLED=true)
+    const { startAutomationScheduler } = require('./services/automationScheduler');
+    startAutomationScheduler();
 
     // Initialize Socket.IO on the HTTP server
     const io = new Server(httpServer, {

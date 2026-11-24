@@ -1,0 +1,176 @@
+.opportunities-section {
+  background: white;
+  border-radius: 10px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.opp-subtitle {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.opp-notice,
+.opp-error {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 6px;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+.opp-notice { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+.opp-error  { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+.opp-notice button,
+.opp-error button {
+  background: none; border: none; cursor: pointer;
+  font-size: 15px; color: inherit; opacity: 0.6; flex-shrink: 0;
+}
+
+.opp-empty { color: #6b7280; font-size: 14px; padding: 20px 0; }
+
+.opp-empty-state {
+  text-align: center;
+  padding: 44px 24px;
+  color: #6b7280;
+}
+.opp-empty-icon { font-size: 40px; margin-bottom: 12px; }
+.opp-empty-state h3 { margin: 0 0 8px; color: #374151; font-size: 17px; }
+.opp-empty-state p { margin: 0 auto; max-width: 460px; font-size: 14px; line-height: 1.6; }
+
+.opp-list { display: flex; flex-direction: column; gap: 12px; }
+
+.opp-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.opp-card:hover {
+  border-color: #c7d2fe;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.07);
+}
+
+.opp-card-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 16px;
+}
+
+/* Score chip — color encodes the recommendation band */
+.opp-score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 58px;
+  height: 58px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+.opp-score-num { font-size: 20px; font-weight: 700; line-height: 1; }
+.opp-score-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 3px; opacity: 0.75; }
+
+.score-strong   { background: #dcfce7; color: #15803d; }
+.score-good     { background: #dbeafe; color: #1d4ed8; }
+.score-marginal { background: #fef3c7; color: #b45309; }
+.score-weak     { background: #f3f4f6; color: #6b7280; }
+.score-unknown  { background: #f3f4f6; color: #9ca3af; }
+
+.opp-card-body { flex: 1; min-width: 0; }
+.opp-title {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #111827;
+  line-height: 1.4;
+}
+.opp-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 8px;
+}
+.opp-urgent { color: #b91c1c; font-weight: 600; }
+.opp-rationale {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #4b5563;
+}
+
+.opp-source {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #2563eb;
+  text-decoration: none;
+}
+.opp-source:hover { text-decoration: underline; }
+
+.opp-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.btn-sm { padding: 6px 14px; font-size: 13px; }
+.opp-toggle {
+  background: none;
+  border: none;
+  color: #2563eb;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px;
+}
+.opp-toggle:hover { text-decoration: underline; }
+
+.opp-detail {
+  border-top: 1px solid #e5e7eb;
+  background: #f9fafb;
+  padding: 16px;
+}
+.opp-detail-block { margin-bottom: 14px; }
+.opp-detail-block:last-of-type { margin-bottom: 0; }
+.opp-detail-block h4 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #6b7280;
+}
+.opp-detail-block ul { margin: 0; padding-left: 18px; }
+.opp-detail-block li { font-size: 13px; line-height: 1.6; color: #374151; }
+.opp-concerns li { color: #92400e; }
+.opp-description {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #4b5563;
+  white-space: pre-wrap;
+}
+.opp-detail-footer {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #e5e7eb;
+  font-size: 12px;
+  color: #6b7280;
+}
+.opp-detail-footer a { color: #2563eb; text-decoration: none; }
+.opp-detail-footer a:hover { text-decoration: underline; }
+
+@media (max-width: 700px) {
+  .opp-card-main { flex-wrap: wrap; }
+  .opp-actions { flex-direction: row; width: 100%; }
+}

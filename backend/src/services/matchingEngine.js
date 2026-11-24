@@ -85,18 +85,63 @@ const MAX_AWARD_BUDGET_MULTIPLE = parseFloat(process.env.MATCH_MAX_AWARD_MULTIPL
 
 /**
  * Grants.gov applicant-type codes an org can plausibly claim.
- * 12 = 501(c)(3) nonprofits, 13 = non-501(c)(3) nonprofits, 25 = "Others",
+ * 12 = 501(c)(3) nonprofits, 13 = non-501(c)(3) nonprofits, 22 = for-profits
+ * other than small businesses, 23 = small businesses, 25 = "Others",
  * 99 = Unrestricted, 00-07 = government tiers.
  */
+const BUSINESS_CODES = ['22', '23', '25', '99'];
+const SPONSORED_CODES = ['12', '13', '25', '99'];
+
+function hasFiscalSponsor(org) {
+  return Boolean(org.fiscalSponsor && org.fiscalSponsor.name);
+}
+
 function eligibleApplicantCodes(org) {
+  // A for-profit business with a fiscally sponsored program can apply two ways.
+  if (org.entityType === 'hybrid' || (org.entityType === 'for_profit_small_business' && hasFiscalSponsor(org))) {
+    return [...new Set([...BUSINESS_CODES, ...SPONSORED_CODES])];
+  }
+  if (org.entityType === 'for_profit_small_business' || org.taxExemptStatus === 'for_profit') {
+    return BUSINESS_CODES;
+  }
   switch (org.taxExemptStatus) {
     case '501c3': return ['12', '25', '99'];
     case '501c4': return ['13', '25', '99'];
-    case 'fiscally_sponsored': return ['12', '13', '25', '99'];
+    case 'fiscally_sponsored': return SPONSORED_CODES;
     case 'government': return ['00', '01', '02', '04', '07', '25', '99'];
     default: return ['25', '99'];
   }
 }
+
+/**
+ * Which entity should apply for an opportunity: the business itself, or the
+ * youth program through its fiscal sponsor. Only meaningful for for-profit
+ * orgs; nonprofits always apply as themselves.
+ *
+ * Private foundations (990-PF filers) and the Utah directory overwhelmingly
+ * fund charities, so for a hybrid org those route to the sponsored program.
+ */
+function applicantLaneFor(opportunity, org) {
+  const isBusiness = org.entityType === 'for_profit_small_business' || org.entityType === 'hybrid';
+  if (!isBusiness) return 'organization';
+  const sponsored = hasFiscalSponsor(org) || org.entityType === 'hybrid';
+
+  const codes = (opportunity.eligibility_codes || []).map(String);
+  const businessOk = codes.some(c => ['22', '23'].includes(c));
+  const charityOk = codes.some(c => ['12', '13'].includes(c));
+  if (businessOk && !charityOk) return 'business';
+  if (charityOk && !businessOk) return sponsored ? 'sponsored_program' : 'business';
+  if (['propublica_990', 'utah_directory'].includes(opportunity.source)) {
+    return sponsored ? 'sponsored_program' : 'business';
+  }
+  return 'business';
+}
+
+const LANE_LABELS = {
+  organization: 'Apply as your organization',
+  business: 'Apply as the business',
+  sponsored_program: 'Apply as the youth program through your fiscal sponsor'
+};
 
 /**
  * Stage 1. Returns {passed, checks} — `checks` is retained on the match row so
@@ -132,12 +177,13 @@ function prefilter(opportunity, org) {
     checks.eligibility = {
       passed: overlap.length > 0,
       matched_codes: overlap,
+      apply_as: applicantLaneFor(opportunity, org),
       reason: overlap.length === 0
-        ? `Open to applicant types [${oppCodes.join(', ')}], which excludes a ${org.taxExemptStatus || 'nonprofit'} applicant`
+        ? `Open to applicant types [${oppCodes.join(', ')}], which excludes a ${org.entityType && org.entityType !== 'nonprofit' ? org.entityType.replace(/_/g, ' ') : (org.taxExemptStatus || 'nonprofit')} applicant`
         : null
     };
   } else {
-    checks.eligibility = { passed: true, matched_codes: [], reason: null };
+    checks.eligibility = { passed: true, matched_codes: [], apply_as: applicantLaneFor(opportunity, org), reason: null };
   }
 
   // Award size sanity — only applied when we know both numbers.
@@ -436,6 +482,8 @@ module.exports = {
   prefilter,
   buildSearchTerms,
   eligibleApplicantCodes,
+  applicantLaneFor,
+  LANE_LABELS,
   localityBoost,
   orgHomeState,
   nteeFieldsFor,

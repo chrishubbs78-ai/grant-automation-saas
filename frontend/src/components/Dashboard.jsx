@@ -9,10 +9,23 @@ import FinancialsVault from './FinancialsVault';
 import ReapplyQueue from './ReapplyQueue';
 import OpportunityFeed from './OpportunityFeed';
 import PipelineTabs from './PipelineTabs';
+import BusinessPlanBuilder from './BusinessPlanBuilder';
+import LoanCenter from './LoanCenter';
+import AutomationCenter from './AutomationCenter';
+import '../styles/funding.css';
 import { connectSocket, disconnectSocket } from '../services/socket';
 import '../styles/dashboard.css';
 
-export default function Dashboard({ orgProfile, onEditProfile }) {
+const VIEWS = [
+  { key: 'grants', label: 'Grants' },
+  { key: 'plan', label: 'Business plan' },
+  { key: 'loans', label: 'Loans' },
+  { key: 'automation', label: 'Automation & Google' }
+];
+
+export default function Dashboard({ orgProfile, onEditProfile, onProfileChanged }) {
+  // Coming back from Google's consent screen lands on the automation view.
+  const [view, setView] = useState(() => (new URLSearchParams(window.location.search).get('google') ? 'automation' : 'grants'));
   const [grants, setGrants] = useState([]);
   const [stats, setStats] = useState({
     submitted: 0,
@@ -457,7 +470,20 @@ export default function Dashboard({ orgProfile, onEditProfile }) {
         )}
       </header>
 
-      <div className="dashboard-main">
+      <nav className="dash-tabs" aria-label="Sections">
+        {VIEWS.map(v => (
+          <button key={v.key} className={`dash-tab${view === v.key ? ' active' : ''}`} onClick={() => setView(v.key)}>
+            {v.label}
+          </button>
+        ))}
+      </nav>
+
+      {view === 'plan' && <BusinessPlanBuilder />}
+      {view === 'loans' && <LoanCenter />}
+      {view === 'automation' && <AutomationCenter orgProfile={orgProfile} onProfileChanged={onProfileChanged} />}
+
+      {/* Hidden rather than unmounted so in-progress grant work survives a tab switch */}
+      <div className="dashboard-main" style={view === 'grants' ? undefined : { display: 'none' }}>
         {/* RFP Upload Section */}
         <section className="rfp-section">
           <div className="section-header">

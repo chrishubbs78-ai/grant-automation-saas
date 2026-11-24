@@ -114,6 +114,7 @@ function App() {
         <Dashboard
           orgProfile={orgProfile}
           onEditProfile={() => setView('questionnaire')}
+          onProfileChanged={(org) => org && setOrgProfile(org)}
         />
       )}
     </div>

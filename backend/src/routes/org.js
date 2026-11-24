@@ -35,6 +35,27 @@ function normalizeNumerics(fields) {
   }
 }
 
+const ENTITY_TYPES = ['nonprofit', 'for_profit_small_business', 'hybrid'];
+const SPONSOR_FIELDS = ['name', 'ein', 'contact_name', 'contact_email', 'fee_pct', 'agreement_status', 'program_name'];
+
+/** Entity type must be known; fiscal sponsor keeps only its known string fields. */
+function validateStructure(fields) {
+  if (fields.entityType !== undefined && !ENTITY_TYPES.includes(fields.entityType)) {
+    return `entityType must be one of: ${ENTITY_TYPES.join(', ')}`;
+  }
+  if (fields.fiscalSponsor !== undefined) {
+    if (fields.fiscalSponsor === null || typeof fields.fiscalSponsor !== 'object' || Array.isArray(fields.fiscalSponsor)) {
+      return 'fiscalSponsor must be an object';
+    }
+    const clean = {};
+    for (const k of SPONSOR_FIELDS) {
+      if (fields.fiscalSponsor[k] !== undefined && fields.fiscalSponsor[k] !== null) clean[k] = String(fields.fiscalSponsor[k]).slice(0, 255);
+    }
+    fields.fiscalSponsor = clean;
+  }
+  return null;
+}
+
 // GET org profile
 router.get('/', verifyToken, async (req, res) => {
   try {
@@ -68,6 +89,7 @@ router.post('/questionnaire', verifyToken, async (req, res) => {
       // Basics
       name, mission, vision, yearsInOperation,
       website, phone, address, ein, taxExemptStatus, nteeCode,
+      entityType, fiscalSponsor,
       // Problem & population
       problemStatement, targetPopulation, geographicScope, geographicServiceArea, annualClientsServed,
       // Programs & evidence
@@ -100,6 +122,7 @@ router.post('/questionnaire', verifyToken, async (req, res) => {
     const updateFields = {
       name, mission, vision, yearsInOperation,
       website, phone, address, ein, taxExemptStatus, nteeCode,
+      entityType, fiscalSponsor,
       problemStatement, targetPopulation, geographicScope, geographicServiceArea, annualClientsServed,
       programsAndServices, theoryOfChange, evidenceBase,
       trackRecord, outcomesData, pastGrantsCount,
@@ -112,6 +135,8 @@ router.post('/questionnaire', verifyToken, async (req, res) => {
     // Strip undefined so partial saves don't overwrite existing values with null
     Object.keys(updateFields).forEach(k => updateFields[k] === undefined && delete updateFields[k]);
     normalizeNumerics(updateFields);
+    const structureError = validateStructure(updateFields);
+    if (structureError) return res.status(400).json({ success: false, error: structureError });
 
     if (org) {
       await org.update(updateFields);
@@ -149,6 +174,7 @@ router.put('/', verifyToken, async (req, res) => {
     const {
       name, mission, vision, yearsInOperation,
       website, phone, address, ein, taxExemptStatus, nteeCode,
+      entityType, fiscalSponsor,
       problemStatement, targetPopulation, geographicScope, geographicServiceArea, annualClientsServed,
       programsAndServices, theoryOfChange, evidenceBase,
       trackRecord, outcomesData, pastGrantsCount,
@@ -163,6 +189,7 @@ router.put('/', verifyToken, async (req, res) => {
     const updateFields = {
       name, mission, vision, yearsInOperation,
       website, phone, address, ein, taxExemptStatus, nteeCode,
+      entityType, fiscalSponsor,
       problemStatement, targetPopulation, geographicScope, geographicServiceArea, annualClientsServed,
       programsAndServices, theoryOfChange, evidenceBase,
       trackRecord, outcomesData, pastGrantsCount,
@@ -174,6 +201,8 @@ router.put('/', verifyToken, async (req, res) => {
     };
     Object.keys(updateFields).forEach(k => updateFields[k] === undefined && delete updateFields[k]);
     normalizeNumerics(updateFields);
+    const structureError = validateStructure(updateFields);
+    if (structureError) return res.status(400).json({ success: false, error: structureError });
 
     await org.update(updateFields);
 

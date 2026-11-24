@@ -231,4 +231,37 @@ async function buildProposalDocx({ org, grant, draft, rfpAnalysis }) {
   return Packer.toBuffer(doc);
 }
 
-module.exports = { buildProposalDocx };
+/**
+ * A plain titled document (business plan, loan packet): cover line, then
+ * one heading and body per section. Returns a Buffer.
+ */
+async function buildSectionsDocx({ title, subtitle, sections }) {
+  const children = [
+    para(title, { size: 40, bold: true, color: '1e3a5f', spaceAfter: 120 }),
+    subtitle ? para(subtitle, { size: 24, color: '4a5568', spaceAfter: 240 }) : null,
+    divider()
+  ].filter(Boolean);
+  for (const section of sections) {
+    if (!section.body || !String(section.body).trim()) continue;
+    children.push(heading1(section.heading));
+    children.push(...bodyParagraphs(String(section.body)));
+  }
+  const doc = new Document({
+    styles: { default: { document: { run: { font: 'Calibri', size: 24 } } } },
+    sections: [{ properties: {}, children }]
+  });
+  return Packer.toBuffer(doc);
+}
+
+/** Plain-text proposal, used as the body of an email submission. */
+function proposalText({ draft }) {
+  return SECTION_DEFS
+    .map(({ key, label }) => {
+      const text = (draft && (draft[key] || draft[FALLBACKS[key]])) || '';
+      return text ? `${label.toUpperCase()}\n\n${text}` : null;
+    })
+    .filter(Boolean)
+    .join('\n\n');
+}
+
+module.exports = { buildProposalDocx, buildSectionsDocx, proposalText, SECTION_DEFS };

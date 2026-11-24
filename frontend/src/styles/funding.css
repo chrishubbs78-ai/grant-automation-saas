@@ -1,0 +1,89 @@
+/* Shared styles for the business plan, loans and automation screens. */
+.dash-tabs {
+  display: flex; gap: 4px; padding: 0 40px; background: white;
+  border-bottom: 1px solid #e5e7eb; overflow-x: auto;
+}
+.dash-tab {
+  padding: 14px 18px; background: none; border: 0; border-bottom: 3px solid transparent;
+  font-size: 15px; font-weight: 600; color: #6b7280; cursor: pointer; white-space: nowrap;
+}
+.dash-tab:hover { color: #1f2937; }
+.dash-tab.active { color: #1e3a5f; border-bottom-color: #1e3a5f; }
+
+.fx-page { max-width: 1100px; margin: 0 auto; padding: 28px 40px 60px; text-align: left; }
+.fx-card {
+  background: white; border-radius: 10px; padding: 22px 24px; margin-bottom: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.fx-card h2 { margin: 0 0 4px; font-size: 19px; color: #1f2937; }
+.fx-card h3 { margin: 18px 0 8px; font-size: 15px; color: #1f2937; }
+.fx-sub { margin: 0 0 14px; font-size: 14px; color: #6b7280; line-height: 1.5; }
+.fx-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.fx-between { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; flex-wrap: wrap; }
+.fx-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+
+.fx-btn {
+  padding: 9px 15px; border-radius: 6px; border: 1px solid #d1d5db; background: white;
+  font-size: 14px; font-weight: 600; color: #1f2937; cursor: pointer;
+}
+.fx-btn:hover:not(:disabled) { background: #f3f4f6; }
+.fx-btn:disabled { opacity: .55; cursor: default; }
+.fx-btn.primary { background: #1e3a5f; border-color: #1e3a5f; color: white; }
+.fx-btn.primary:hover:not(:disabled) { background: #16304f; }
+.fx-btn.small { padding: 5px 10px; font-size: 13px; }
+
+.fx-field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+.fx-field label { font-size: 13.5px; font-weight: 600; color: #374151; }
+.fx-field .fx-help { font-size: 12.5px; color: #6b7280; }
+.fx-field input, .fx-field select, .fx-field textarea {
+  padding: 9px 11px; border: 1px solid #d1d5db; border-radius: 6px; font: inherit; font-size: 14px;
+}
+.fx-field textarea { min-height: 78px; resize: vertical; line-height: 1.45; }
+.fx-check { display: flex; gap: 9px; align-items: flex-start; font-size: 14px; color: #374151; margin-bottom: 10px; }
+.fx-check input { margin-top: 3px; }
+
+.fx-msg { padding: 10px 13px; border-radius: 6px; font-size: 14px; margin-bottom: 14px; }
+.fx-msg.err { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+.fx-msg.ok { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+.fx-msg.info { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+
+.fx-pill { display: inline-block; padding: 2px 9px; border-radius: 10px; font-size: 12px; font-weight: 700; }
+.fx-pill.high { background: #fee2e2; color: #991b1b; }
+.fx-pill.medium { background: #fef3c7; color: #92400e; }
+.fx-pill.low, .fx-pill.neutral { background: #eef2f7; color: #4b5563; }
+.fx-pill.good { background: #d1fae5; color: #065f46; }
+
+.fx-meter { height: 8px; border-radius: 4px; background: #e5e7eb; overflow: hidden; }
+.fx-meter > span { display: block; height: 100%; background: #1e3a5f; }
+
+.fx-list { list-style: none; padding: 0; margin: 0; }
+.fx-list li { padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-size: 14px; color: #374151; line-height: 1.45; }
+.fx-list li:last-child { border-bottom: 0; }
+.fx-muted { color: #6b7280; font-size: 13px; }
+
+/* Business plan builder */
+.bp-layout { display: grid; grid-template-columns: 260px 1fr; gap: 20px; }
+.bp-nav { position: sticky; top: 12px; align-self: start; }
+.bp-nav button {
+  display: flex; justify-content: space-between; width: 100%; text-align: left; gap: 8px;
+  padding: 9px 11px; border: 0; background: none; border-radius: 6px; font-size: 14px; color: #374151; cursor: pointer;
+}
+.bp-nav button.active { background: #eef2f7; color: #1e3a5f; font-weight: 700; }
+.bp-written { white-space: pre-wrap; font-size: 14.5px; line-height: 1.6; color: #1f2937; }
+.bp-written-edit { width: 100%; min-height: 260px; padding: 12px; border: 1px solid #d1d5db; border-radius: 6px; font: inherit; line-height: 1.55; box-sizing: border-box; }
+
+/* Loans */
+.ln-program { border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 6px; }
+.ln-program h4 { margin: 0; font-size: 15px; color: #1f2937; }
+.ln-program ul { margin: 2px 0 0 16px; padding: 0; font-size: 13px; color: #374151; }
+.ln-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.ln-table th, .ln-table td { text-align: left; padding: 9px 8px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+.ln-table th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #6b7280; }
+.ln-scroll { overflow-x: auto; }
+
+@media (max-width: 800px) {
+  .fx-page { padding: 18px 16px 40px; }
+  .dash-tabs { padding: 0 8px; }
+  .bp-layout { grid-template-columns: 1fr; }
+  .bp-nav { position: static; }
+}

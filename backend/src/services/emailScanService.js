@@ -123,7 +123,10 @@ async function fetchRecentMessages() {
  * @returns {Promise<{scanned:number,matched:number,classified:number,created:number,skipped:string|null}>}
  */
 async function scanForOrg(orgId) {
-  if (!isConfigured()) {
+  // A connected Google account (read-only Gmail scope) replaces the IMAP setup.
+  const googleService = require('./googleService');
+  const gmail = googleService.isConfigured() ? await googleService.getConnection(orgId) : null;
+  if (!gmail && !isConfigured()) {
     return { scanned: 0, matched: 0, classified: 0, created: 0, skipped: 'not_configured' };
   }
 
@@ -138,7 +141,9 @@ async function scanForOrg(orgId) {
 
   let messages;
   try {
-    messages = await fetchRecentMessages();
+    messages = gmail
+      ? await googleService.listRecentMessages(gmail, { days: LOOKBACK_DAYS, snippetChars: SNIPPET_CHARS })
+      : await fetchRecentMessages();
   } catch (error) {
     logger.error({ error: error.message }, 'Inbox scan could not connect');
     throw new Error(`Could not reach the mail server: ${error.message}`);

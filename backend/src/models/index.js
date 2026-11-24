@@ -27,6 +27,9 @@ const GrantOpportunity = require('./GrantOpportunity');
 const OpportunityMatch = require('./OpportunityMatch');
 const ApplicationDocument = require('./ApplicationDocument');
 const EmailFinding = require('./EmailFinding');
+const LoanApplication = require('./LoanApplication');
+const GoogleConnection = require('./GoogleConnection');
+const AutomationRun = require('./AutomationRun');
 
 // Initialize models
 const models = {
@@ -44,7 +47,10 @@ const models = {
   GrantOpportunity: GrantOpportunity(sequelize),
   OpportunityMatch: OpportunityMatch(sequelize),
   ApplicationDocument: ApplicationDocument(sequelize),
-  EmailFinding: EmailFinding(sequelize)
+  EmailFinding: EmailFinding(sequelize),
+  LoanApplication: LoanApplication(sequelize),
+  GoogleConnection: GoogleConnection(sequelize),
+  AutomationRun: AutomationRun(sequelize)
 };
 
 // Define associations

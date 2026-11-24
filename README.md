@@ -1,5 +1,19 @@
 # Grant Automation SaaS
 
+## Funding tools (November 2026)
+
+Four tabs sit on top of the grant pipeline:
+
+- **Business plan:** a guided builder. You answer plain questions section by section (including the youth after-school program), Claude researches the local market with web search, reviews the plan the way a grant reviewer and an SBA loan officer would, and writes each section professionally. Written sections feed every grant draft and loan packet. Export to .docx or Google Drive.
+- **Loans:** a lender readiness check, SBA Microloan / 7(a) / Express / 504, CDFI and Utah programs ranked for your amount, credit and time in business, a loan tracker with next-step dates, and an AI-written loan request packet.
+- **Automation & Google:** connect Google once (Gmail, Calendar, Drive). Each automation run discovers grants, starts strong matches, writes funder-tailored drafts, reapplies when cycles reopen, saves editable Google Docs, prepares (or, if you allow it, sends) email submissions, puts every deadline in Calendar with reminders, scans the inbox for funder replies, and emails you a digest plus the list of things only you can do.
+- **Who applies:** a for-profit store with a fiscally sponsored youth program. Opportunities are routed automatically: charity-only and foundation grants go to the youth program through the sponsor; small-business grants go to the store. Drafts are written for the right applicant.
+
+What still needs you: funder web portals (Grants.gov, Submittable and similar) need you signed in; certifications, sponsor sign-off and loan documents need your signature. The tool prepares everything up to that point and lists those steps for you.
+
+Setup: see the Google and automation entries at the bottom of `backend/.env.example`.
+
+
 A fully automated pipeline for grant research, writing, and execution. Upload an RFP → get AI-generated draft → track submissions → learn from outcomes.
 
 **Status:** Week 1 Foundation Complete

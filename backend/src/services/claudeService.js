@@ -324,6 +324,8 @@ function buildOrgContext(org) {
   const planSections = [
     ['Executive Summary', plan.executive_summary],
     ['Products & Programs', plan.products_and_programs],
+    ['Youth Program', plan.youth_program],
+    ['Management & Team', plan.management_team],
     ['Market / Community Analysis', plan.market_analysis],
     ['Marketing & Outreach', plan.marketing_outreach],
     ['Operations Plan', plan.operations_plan],
@@ -337,7 +339,12 @@ function buildOrgContext(org) {
     ? `\n\nBUSINESS PLAN:\n${planSections.map(([label, v]) => `${label}: ${v}`).join('\n')}`
     : '';
 
-  return `ORGANIZATION: ${org.name}
+  const sponsor = org.fiscalSponsor || {};
+  const structureBlock = org.entityType && org.entityType !== 'nonprofit'
+    ? `\nLEGAL STRUCTURE: ${org.entityType === 'hybrid' ? 'For-profit small business with a fiscally sponsored community program' : 'For-profit small business'}${sponsor.name ? `\nFISCAL SPONSOR (for the youth program): ${sponsor.name}${sponsor.ein ? `, EIN ${sponsor.ein}` : ''}${sponsor.program_name ? ` — program name: ${sponsor.program_name}` : ''}` : ''}`
+    : '';
+
+  return `ORGANIZATION: ${org.name}${structureBlock}
 EIN: ${org.ein || 'Not provided'} | Tax Status: ${org.taxExemptStatus || org.tax_exempt_status || '501(c)(3)'}
 Website: ${org.website || 'N/A'} | Phone: ${org.phone || 'N/A'}
 Years Operating: ${org.yearsInOperation || org.years_in_operation || 'N/A'}
@@ -374,13 +381,73 @@ ${previousGrantors}${businessPlanBlock}`;
 
 // ─── FULL EXPERT DRAFT GENERATION ─────────────────────────────────────────────
 
-async function generateDraft({ orgProfile, rfpAnalysis, analytics }) {
+/**
+ * Instructions that change who the proposal speaks for. A for-profit store
+ * applying for a small-business grant reads very differently from its youth
+ * program applying through a nonprofit fiscal sponsor.
+ */
+function laneInstructions(orgProfile, lane) {
+  const sponsor = (orgProfile && orgProfile.fiscalSponsor) || {};
+  if (lane === 'sponsored_program') {
+    return `
+APPLICANT FRAMING: This proposal is submitted for the youth after-school and guided gaming program${sponsor.program_name ? ` ("${sponsor.program_name}")` : ''}, a fiscally sponsored project of ${sponsor.name || 'a nonprofit fiscal sponsor'}${sponsor.ein ? ` (EIN ${sponsor.ein})` : ''}. Write it as a charitable youth program: the need among local kids, who is served, the program model, measurable youth outcomes, safety, and cost to families. Present the store as the program's host venue and in-kind partner (space, games, staff time), never as the beneficiary. Grant funds pay for program costs only.`;
+  }
+  if (lane === 'business') {
+    return `
+APPLICANT FRAMING: The applicant is a for-profit small business. Write for a small-business or economic development funder: jobs created, local economic impact, community benefit (including the youth program), the owner's capacity, and a clear use of funds tied to growth milestones. Replace nonprofit-only language (board governance, donors) with business equivalents (ownership, advisors, customers).`;
+  }
+  return '';
+}
+
+/**
+ * Rewrites the business plan's emphasis for one funder: same facts, ordered and
+ * worded around what that funder scores. Feeds the draft so the proposal leads
+ * with what this reviewer cares about.
+ */
+async function tailorPlanForFunder({ orgProfile, rfpAnalysis, lane }) {
+  const { writeJson } = require('./claudeWriter');
+  const plan = orgProfile.businessPlan || {};
+  return writeJson({
+    system: 'You are a professional grant writer. You reframe existing facts for a specific funder; you never add facts that are not in the source material.',
+    effort: 'medium',
+    prompt: `Rewrite the emphasis of this business plan for the funder below. Keep every fact true to the source; change ordering, framing and vocabulary to match what the funder prioritizes.${laneInstructions(orgProfile, lane)}
+
+Return ONLY JSON:
+{
+  "funder_priorities": ["what this funder most wants to see"],
+  "angle": "1-2 sentences: the single strongest case for this funder",
+  "tailored_sections": {"<plan section key>": "rewritten section text, only for sections that matter to this funder"},
+  "facts_to_lead_with": ["the 3-5 strongest facts from the plan for this funder"],
+  "missing_for_this_funder": ["things this funder will look for that the plan does not have yet"]
+}
+
+FUNDER: ${rfpAnalysis.funder_name || 'Unknown'}
+PRIORITIES: ${(rfpAnalysis.priority_areas || []).join('; ') || 'Not specified'}
+EVALUATION CRITERIA: ${JSON.stringify(rfpAnalysis.evaluation_criteria || {})}
+ELIGIBILITY: ${JSON.stringify(rfpAnalysis.eligibility || {})}
+
+BUSINESS PLAN:
+${Object.entries(plan).filter(([, v]) => typeof v === 'string' && v.trim()).map(([k, v]) => `${k}: ${v}`).join('\n\n') || '(no plan sections yet)'}`,
+    mock: () => ({
+      funder_priorities: rfpAnalysis.priority_areas || [],
+      angle: `[MOCK] Lead with community youth impact for ${rfpAnalysis.funder_name || 'this funder'}.`,
+      tailored_sections: {},
+      facts_to_lead_with: [],
+      missing_for_this_funder: []
+    })
+  });
+}
+
+async function generateDraft({ orgProfile, rfpAnalysis, analytics, lane = 'organization', tailoring = null }) {
   if (USE_MOCK_API) {
     console.log('[MOCK] Generating expert draft with mock Claude response...');
     return getMockDraft({ orgProfile, rfpAnalysis });
   }
 
   const orgContext = buildOrgContext(orgProfile);
+  const tailoringContext = tailoring
+    ? `\nFUNDER-SPECIFIC ANGLE (lead with this):\n${tailoring.angle || ''}\nFacts to lead with: ${(tailoring.facts_to_lead_with || []).join('; ')}\nTailored plan sections:\n${Object.entries(tailoring.tailored_sections || {}).map(([k, v]) => `${k}: ${v}`).join('\n\n')}`
+    : '';
   const learningContext = analytics && analytics.recommendations && analytics.recommendations.length > 0
     ? `\nLEARNING ENGINE INSIGHTS (from past submissions):\n${analytics.recommendations.map(r => `  • ${r.message || r}`).join('\n')}`
     : '';
@@ -390,7 +457,7 @@ async function generateDraft({ orgProfile, rfpAnalysis, analytics }) {
     max_tokens: 5000,
     messages: [{
       role: 'user',
-      content: `You are a professional grant writer with 20+ years of experience winning millions in funding for nonprofits. Write a compelling, complete grant proposal for the organization below targeting the specified funder.
+      content: `You are a professional grant writer with 20+ years of experience winning millions in funding for nonprofits, community programs and small businesses. Write a compelling, complete grant proposal for the organization below targeting the specified funder.
 
 Your writing must:
 - Sound authoritative and evidence-based — use specific numbers, not vague claims
@@ -425,6 +492,7 @@ Key Requirements: ${(rfpAnalysis.key_requirements || rfpAnalysis.requirements ||
 Evaluation Criteria: ${JSON.stringify(rfpAnalysis.evaluation_criteria || {})}
 Eligibility: ${JSON.stringify(rfpAnalysis.eligibility || {})}
 Matching Requirements: ${rfpAnalysis.matching_requirements || 'None'}
+${laneInstructions(orgProfile, lane)}${tailoringContext}
 ${learningContext}`
     }]
   });
@@ -527,5 +595,7 @@ module.exports = {
   generateImprovedDraft,
   scoreOpportunityMatches,
   classifyFunderEmails,
-  buildOrgContext
+  buildOrgContext,
+  laneInstructions,
+  tailorPlanForFunder
 };

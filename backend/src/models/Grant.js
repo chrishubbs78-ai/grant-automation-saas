@@ -59,6 +59,24 @@ module.exports = (sequelize) => {
       references: { model: 'grant_opportunities', key: 'id' },
       comment: 'Discovered opportunity this application came from, if any'
     },
+    applicant_lane: {
+      type: DataTypes.STRING(30),
+      defaultValue: 'organization',
+      comment: 'organization (default), business (for-profit store), sponsored_program (youth program via fiscal sponsor)'
+    },
+    submission_method: {
+      type: DataTypes.STRING(30),
+      comment: 'email, portal, mail — how this funder accepts applications'
+    },
+    submission_email: {
+      type: DataTypes.STRING(255),
+      comment: 'Funder address for email submissions'
+    },
+    google: {
+      type: DataTypes.JSONB,
+      defaultValue: {},
+      comment: '{ gmail_draft_id, gmail_message_id, calendar_event_ids[], drive_file_id, drive_link }'
+    },
     created_at: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW

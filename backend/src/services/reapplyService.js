@@ -157,6 +157,9 @@ async function executeReapply(candidateId, orgId) {
     status: 'draft',
     rfp_analysis: originalGrant.rfp_analysis,
     parent_grant_id: originalGrant.id,
+    applicant_lane: originalGrant.applicant_lane || 'organization',
+    submission_method: originalGrant.submission_method || null,
+    submission_email: originalGrant.submission_email || null,
     reapply_count: (originalGrant.reapply_count || 0) + 1,
     notes: `Reapplication of grant ${originalGrant.id} (rejected). Auto-generated improved draft.`
   });
@@ -177,9 +180,17 @@ async function executeReapply(candidateId, orgId) {
     grant_id: newGrant.id,
     org_id: orgId,
     version: previousVersion + 1,
-    problem_statement: improvedDraft.problem_statement || '',
-    impact_statement: improvedDraft.impact_statement || '',
-    budget_narrative: improvedDraft.budget_narrative || ''
+    problem_statement: improvedDraft.statement_of_need || improvedDraft.problem_statement || '',
+    impact_statement: improvedDraft.goals_and_objectives || improvedDraft.impact_statement || '',
+    budget_narrative: improvedDraft.budget_narrative || '',
+    // Keep every improved section on the draft record, not just the legacy three.
+    executive_summary: improvedDraft.executive_summary || '',
+    organization_background: improvedDraft.organization_background || '',
+    statement_of_need: improvedDraft.statement_of_need || '',
+    goals_and_objectives: improvedDraft.goals_and_objectives || '',
+    program_design: improvedDraft.program_design || '',
+    evaluation_plan: improvedDraft.evaluation_plan || '',
+    sustainability_plan: improvedDraft.sustainability_plan || ''
   });
 
   await newGrant.update({ draft_sections: improvedDraft });
